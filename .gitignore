@@ -40,5 +40,5 @@
 # debug information files
 *.dwo
 
-.github/
+.github/copilot-instructions.md
 .private/
