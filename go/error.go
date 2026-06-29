@@ -72,4 +72,3 @@ const (
 	// ErrorOriginCapture indicates the error is attributable to the responder's reply.
 	ErrorOriginCapture ErrorOrigin = "capture_error"
 )
-

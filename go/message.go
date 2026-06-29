@@ -278,7 +278,8 @@ func (r *Response) ArgIf(name string, def string) string {
 // parseResponse parses a raw response string into a Response.
 //
 // Expected format: ~handle:subject ok [key=value ...]
-//                  ~handle:subject error code=X what=Y
+//
+//	~handle:subject error code=X what=Y
 func parseResponse(raw string) (*Response, error) {
 	if !strings.HasPrefix(raw, "~") {
 		return nil, fmt.Errorf("not a response message")
@@ -351,6 +352,7 @@ func parseResponse(raw string) (*Response, error) {
 //	`foo bar="hello world" baz`          → ["foo", `bar="hello world"`, "baz"]
 //	`echo items=["a", "b", "c"] ~h1`     → ["echo", `items=["a", "b", "c"]`, "~h1"]
 //	`cmd data={key: value with spaces}`  → ["cmd", `data={key: value with spaces}`]
+//
 // WitnessKind identifies the type of a witness copy received from the hub.
 // Exactly one kind flag is present on every witness message.
 type WitnessKind string

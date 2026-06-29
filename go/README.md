@@ -130,9 +130,9 @@ client := spore.NewClientWithSocket("com.example.mynode", "/custom/path.sock")
 ```
 
 `DefaultSocketPath` is an exported variable with the correct socket path for the current platform:
-- **Linux:** `/run/spore/spore.sock`
-- **macOS:** `/Library/Application Support/spore-os/run/spore.sock`
-- **Windows:** `C:\ProgramData\spore-os\spore.sock`
+- **Linux:** `/var/lib/spore-os/spore.sock`
+- **macOS:** `/Library/Application Support/spore-os/spore.sock`
+- **Windows:** `%LOCALAPPDATA%\spore-os\spore.sock`
 
 ---
 

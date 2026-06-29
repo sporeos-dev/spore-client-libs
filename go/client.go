@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"runtime"
 	"strings"
 	"sync"
@@ -16,21 +17,24 @@ import (
 )
 
 // DefaultSocketPath is the path to the spore hub Unix socket.
-// The daemon runs as a system-level service, so the socket lives in a
-// system directory rather than a per-user path:
-//   - Linux:   /run/spore/spore.sock
-//   - macOS:   /Library/Application Support/spore-os/run/spore.sock
-//   - Windows: C:\ProgramData\spore-os\spore.sock
+// The daemon runs as a system-level service, so the socket lives in the
+// data root directory:
+//   - Linux:   /var/lib/spore-os/spore.sock
+//   - macOS:   /Library/Application Support/spore-os/spore.sock
+//   - Windows: %LOCALAPPDATA%\spore-os\spore.sock
 var DefaultSocketPath = defaultSocketPath()
 
 func defaultSocketPath() string {
 	switch runtime.GOOS {
 	case "linux":
-		return "/run/spore/spore.sock"
+		return "/var/lib/spore-os/spore.sock"
 	case "darwin":
-		return "/Library/Application Support/spore-os/run/spore.sock"
+		return "/Library/Application Support/spore-os/spore.sock"
 	case "windows":
-		return `C:\ProgramData\spore-os\spore.sock`
+		if localAppData := os.Getenv("LOCALAPPDATA"); localAppData != "" {
+			return localAppData + `\spore-os\spore.sock`
+		}
+		return `C:\Users\Default\AppData\Local\spore-os\spore.sock`
 	default:
 		return "/tmp/spore.sock"
 	}
@@ -532,7 +536,6 @@ func (c *Client) WaitFor(handle string, timeoutMs int) (*Response, error) {
 		}
 	}
 }
-
 
 func (c *Client) handshake() error {
 	_, err := c.conn.Write([]byte(c.nodeID + "\n"))

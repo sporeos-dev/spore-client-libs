@@ -1527,4 +1527,3 @@ func TestFormatArgValue_ObjectNotQuoted(t *testing.T) {
 		t.Errorf("got %q", got)
 	}
 }
-
