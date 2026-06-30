@@ -1527,3 +1527,217 @@ func TestFormatArgValue_ObjectNotQuoted(t *testing.T) {
 		t.Errorf("got %q", got)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// PublishMessage / parsePublish tests
+// ---------------------------------------------------------------------------
+
+func TestParsePublish_Simple(t *testing.T) {
+	msg, err := parsePublish("publish my.topic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if msg.Topic != "my.topic" {
+		t.Errorf("expected topic 'my.topic', got '%s'", msg.Topic)
+	}
+}
+
+func TestParsePublish_WithArgs(t *testing.T) {
+	msg, err := parsePublish("publish sensors.temperature value=42.5 unit=celsius cast=dev.sporeos.sensor")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if msg.Topic != "sensors.temperature" {
+		t.Errorf("expected topic 'sensors.temperature', got '%s'", msg.Topic)
+	}
+	if msg.ArgIf("value", "") != "42.5" {
+		t.Errorf("expected value '42.5', got '%s'", msg.ArgIf("value", ""))
+	}
+	if msg.ArgIf("unit", "") != "celsius" {
+		t.Errorf("expected unit 'celsius', got '%s'", msg.ArgIf("unit", ""))
+	}
+	if msg.Cast != "dev.sporeos.sensor" {
+		t.Errorf("expected cast 'dev.sporeos.sensor', got '%s'", msg.Cast)
+	}
+	if msg.HasArg("cast") {
+		t.Error("cast should not appear in Args")
+	}
+}
+
+func TestParsePublish_WithFlags(t *testing.T) {
+	msg, err := parsePublish("publish alerts.door opened cast=dev.sporeos.security")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !msg.HasFlag("opened") {
+		t.Error("expected 'opened' flag")
+	}
+	if msg.Cast != "dev.sporeos.security" {
+		t.Errorf("expected cast 'dev.sporeos.security', got '%s'", msg.Cast)
+	}
+}
+
+func TestParsePublish_QuotedArg(t *testing.T) {
+	msg, err := parsePublish(`publish chat.messages text="hello world" cast=dev.sporeos.chat`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if msg.ArgIf("text", "") != "hello world" {
+		t.Errorf("expected 'hello world', got '%s'", msg.ArgIf("text", ""))
+	}
+}
+
+func TestParsePublish_MissingTopic(t *testing.T) {
+	_, err := parsePublish("publish ")
+	if err == nil {
+		t.Error("expected error for missing topic")
+	}
+}
+
+func TestParsePublish_NotPublish(t *testing.T) {
+	_, err := parsePublish("clock.get_time")
+	if err == nil {
+		t.Error("expected error for non-publish message")
+	}
+}
+
+func TestPublishMessage_Arg_Panics(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic for missing arg")
+		}
+	}()
+	msg := &PublishMessage{Args: map[string]string{}, Flags: []string{}}
+	_ = msg.Arg("missing")
+}
+
+func TestPublishMessage_HasFlag(t *testing.T) {
+	msg := &PublishMessage{Args: map[string]string{}, Flags: []string{"urgent", "loud"}}
+	if !msg.HasFlag("urgent") {
+		t.Error("expected 'urgent' flag")
+	}
+	if msg.HasFlag("quiet") {
+		t.Error("unexpected 'quiet' flag")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Subscribe / Unsubscribe tests
+// ---------------------------------------------------------------------------
+
+// makeSubscribeClient creates a client primed for a single subscribe-style
+// interaction. The reader is seeded with one response line so that SendAndWait
+// (in standalone mode) can receive the hub ACK without a real socket.
+func makeSubscribeClient(ackLine string) *Client {
+	c := NewClientWithSocket("dev.test.node", "/unused")
+	mock := &mockConn{}
+	c.conn = mock
+	c.reader = bufio.NewReader(strings.NewReader(ackLine + "\n"))
+	return c
+}
+
+func TestSubscribe_FirstTime_SendsWireMessage(t *testing.T) {
+	// The handle counter starts at 0, so the first auto-handle is "sub1".
+	c := makeSubscribeClient("~sub1:SPORE.topic.subscribe ok capture=SPORE.hub")
+
+	received := make(chan *PublishMessage, 1)
+	if err := c.Subscribe("sensors.temperature", func(msg *PublishMessage) {
+		received <- msg
+	}, 500); err != nil {
+		t.Fatalf("Subscribe: %v", err)
+	}
+
+	// Wire message must have been written to the connection.
+	written := string(c.conn.(*mockConn).written)
+	if !strings.Contains(written, "SPORE.topic.subscribe") {
+		t.Errorf("expected SPORE.topic.subscribe in wire message, got: %s", written)
+	}
+	if !strings.Contains(written, "topic=sensors.temperature") {
+		t.Errorf("expected topic=sensors.temperature in wire message, got: %s", written)
+	}
+
+	// Callback must be registered — fire a publish directly and check it fires.
+	c.deliverPublish("publish sensors.temperature value=23.1 cast=dev.sporeos.sensor")
+	select {
+	case msg := <-received:
+		if msg.ArgIf("value", "") != "23.1" {
+			t.Errorf("expected value '23.1', got '%s'", msg.ArgIf("value", ""))
+		}
+		if msg.Cast != "dev.sporeos.sensor" {
+			t.Errorf("expected cast 'dev.sporeos.sensor', got '%s'", msg.Cast)
+		}
+	default:
+		t.Error("callback was not called after deliverPublish")
+	}
+}
+
+func TestSubscribe_SecondCall_OnlyUpdatesCallback(t *testing.T) {
+	// Pre-seed only ONE ack response — if Subscribe sends a second wire message
+	// the reader would EOF and SendAndWait would return an error.
+	c := makeSubscribeClient("~sub1:SPORE.topic.subscribe ok capture=SPORE.hub")
+
+	firstReceived := make(chan *PublishMessage, 1)
+	if err := c.Subscribe("alerts.door", func(msg *PublishMessage) {
+		firstReceived <- msg
+	}, 500); err != nil {
+		t.Fatalf("first Subscribe: %v", err)
+	}
+	writtenAfterFirst := len(c.conn.(*mockConn).written)
+
+	// Second Subscribe for same topic — must not send any wire message.
+	secondReceived := make(chan *PublishMessage, 1)
+	if err := c.Subscribe("alerts.door", func(msg *PublishMessage) {
+		secondReceived <- msg
+	}, 500); err != nil {
+		t.Fatalf("second Subscribe: %v", err)
+	}
+	if len(c.conn.(*mockConn).written) != writtenAfterFirst {
+		t.Error("second Subscribe must not write to the connection")
+	}
+
+	// Deliver a publish — only the new (second) callback should fire.
+	c.deliverPublish("publish alerts.door opened cast=dev.sporeos.security")
+	select {
+	case msg := <-secondReceived:
+		if !msg.HasFlag("opened") {
+			t.Error("expected 'opened' flag in publish")
+		}
+	default:
+		t.Error("new callback was not called")
+	}
+	select {
+	case <-firstReceived:
+		t.Error("old callback should not have been called")
+	default:
+	}
+}
+
+func TestUnsubscribe_SendsWireMessageAndRemovesCallback(t *testing.T) {
+	c := makeSubscribeClient("~sub1:SPORE.topic.unsubscribe ok capture=SPORE.hub")
+
+	// Pre-register a callback as if a prior Subscribe had run.
+	c.mu.Lock()
+	c.publishHandlers["my.topic"] = func(msg *PublishMessage) {}
+	c.mu.Unlock()
+
+	if err := c.Unsubscribe("my.topic", 500); err != nil {
+		t.Fatalf("Unsubscribe: %v", err)
+	}
+
+	// Wire message must have been sent.
+	written := string(c.conn.(*mockConn).written)
+	if !strings.Contains(written, "SPORE.topic.unsubscribe") {
+		t.Errorf("expected SPORE.topic.unsubscribe in written, got: %s", written)
+	}
+	if !strings.Contains(written, "topic=my.topic") {
+		t.Errorf("expected topic=my.topic in written, got: %s", written)
+	}
+
+	// Callback must be gone.
+	c.mu.RLock()
+	_, stillThere := c.publishHandlers["my.topic"]
+	c.mu.RUnlock()
+	if stillThere {
+		t.Error("callback was not removed after Unsubscribe")
+	}
+}

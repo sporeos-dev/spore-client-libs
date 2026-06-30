@@ -66,6 +66,9 @@ type Client struct {
 	waitersMu sync.Mutex
 	waiters   map[string]chan *Response
 
+	publishHandlers map[string]PublishHandlerFunc
+	handleCounter   atomic.Int64
+
 	listening atomic.Bool
 }
 
@@ -76,6 +79,7 @@ func NewClient(nodeID string) *Client {
 		handlers:         make(map[string]HandlerFunc),
 		responseHandlers: make(map[string]ResponseHandlerFunc),
 		waiters:          make(map[string]chan *Response),
+		publishHandlers:  make(map[string]PublishHandlerFunc),
 	}
 }
 
@@ -86,6 +90,7 @@ func NewClientWithSocket(nodeID string, socketPath string) *Client {
 		handlers:         make(map[string]HandlerFunc),
 		responseHandlers: make(map[string]ResponseHandlerFunc),
 		waiters:          make(map[string]chan *Response),
+		publishHandlers:  make(map[string]PublishHandlerFunc),
 	}
 }
 
@@ -199,6 +204,11 @@ func (c *Client) Listen() error {
 			continue
 		}
 
+		if strings.HasPrefix(raw, "publish ") {
+			c.deliverPublish(raw)
+			continue
+		}
+
 		if strings.HasPrefix(raw, "~") {
 			c.deliverResponse(raw)
 			continue
@@ -225,6 +235,24 @@ func (c *Client) deliverWitness(raw string) {
 
 	c.mu.RLock()
 	handler := c.witnessHandler
+	c.mu.RUnlock()
+
+	if handler != nil {
+		handler(msg)
+	}
+}
+
+// deliverPublish parses a raw publish line and dispatches it to the registered
+// callback for that topic, if any. It is a no-op when no callback is registered
+// or when the message cannot be parsed.
+func (c *Client) deliverPublish(raw string) {
+	msg, err := parsePublish(raw)
+	if err != nil {
+		return
+	}
+
+	c.mu.RLock()
+	handler := c.publishHandlers[msg.Topic]
 	c.mu.RUnlock()
 
 	if handler != nil {
@@ -535,6 +563,84 @@ func (c *Client) WaitFor(handle string, timeoutMs int) (*Response, error) {
 			return resp, nil
 		}
 	}
+}
+
+// Subscribe registers a callback for incoming publish messages on the given topic
+// and, on the first call for that topic, sends a subscribe request to the hub.
+//
+// If a callback is already registered for this topic, the callback is replaced
+// without sending another subscribe request — the subscription on the hub side
+// remains active.
+//
+// The callback fires on the Listen() goroutine. If the callback is slow or
+// blocks, it delays all other incoming messages. Spin up a goroutine inside
+// the callback if you need non-blocking processing.
+//
+// timeoutMs controls how long to wait for the hub's acknowledgement on the
+// initial subscription. Subsequent calls (callback replacement) do not use it.
+func (c *Client) Subscribe(topic string, callback PublishHandlerFunc, timeoutMs int) error {
+	if c.conn == nil {
+		return errors.New("not connected")
+	}
+
+	c.mu.Lock()
+	_, alreadySubscribed := c.publishHandlers[topic]
+	c.publishHandlers[topic] = callback
+	c.mu.Unlock()
+
+	if alreadySubscribed {
+		// Just a callback swap — no wire message needed.
+		return nil
+	}
+
+	handle := fmt.Sprintf("sub%d", c.handleCounter.Add(1))
+	msg := fmt.Sprintf("SPORE.topic.subscribe topic=%s ~%s", topic, handle)
+
+	resp, err := c.SendAndWait(msg, timeoutMs)
+	if err != nil {
+		// Roll back the registration so the caller can retry.
+		c.mu.Lock()
+		delete(c.publishHandlers, topic)
+		c.mu.Unlock()
+		return fmt.Errorf("subscribe failed: %w", err)
+	}
+	if !resp.OK {
+		c.mu.Lock()
+		delete(c.publishHandlers, topic)
+		c.mu.Unlock()
+		return fmt.Errorf("subscribe rejected: %s: %s", resp.ErrCode, resp.ErrWhat)
+	}
+
+	return nil
+}
+
+// Unsubscribe sends an unsubscribe request to the hub for the given topic and
+// removes the registered publish callback. Returns an error if the hub rejects
+// the request or the connection fails.
+//
+// If no callback was registered for the topic, the unsubscribe message is still
+// sent (in case a previous session left a stale subscription on the hub).
+func (c *Client) Unsubscribe(topic string, timeoutMs int) error {
+	if c.conn == nil {
+		return errors.New("not connected")
+	}
+
+	handle := fmt.Sprintf("sub%d", c.handleCounter.Add(1))
+	msg := fmt.Sprintf("SPORE.topic.unsubscribe topic=%s ~%s", topic, handle)
+
+	resp, err := c.SendAndWait(msg, timeoutMs)
+	if err != nil {
+		return fmt.Errorf("unsubscribe failed: %w", err)
+	}
+	if !resp.OK {
+		return fmt.Errorf("unsubscribe rejected: %s: %s", resp.ErrCode, resp.ErrWhat)
+	}
+
+	c.mu.Lock()
+	delete(c.publishHandlers, topic)
+	c.mu.Unlock()
+
+	return nil
 }
 
 func (c *Client) handshake() error {

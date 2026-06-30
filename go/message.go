@@ -539,6 +539,108 @@ func parseWitness(raw string) (*WitnessMessage, error) {
 	return msg, nil
 }
 
+// PublishHandlerFunc is the signature for callbacks registered with Subscribe.
+type PublishHandlerFunc func(msg *PublishMessage)
+
+// PublishMessage represents an incoming pub/sub message delivered by the hub.
+//
+// Published messages are fire-and-forget — they carry no handle and expect no
+// response. The hub delivers a copy to every node subscribed to the topic.
+//
+// Use Arg/ArgIf/HasArg to read arguments and HasFlag for bare flag tokens.
+// Cast identifies the node that published the message.
+type PublishMessage struct {
+	// Topic is the topic name the message was published to.
+	Topic string
+
+	// Cast is the node ID of the publisher (from the cast= field injected by the hub).
+	Cast string
+
+	// Args holds all key=value pairs from the message, excluding cast.
+	Args map[string]string
+
+	// Flags holds all bare flag tokens from the message.
+	Flags []string
+}
+
+// Arg returns the value of a named argument. Panics if the argument is not present.
+// Use ArgIf for a safe default.
+func (p *PublishMessage) Arg(name string) string {
+	val, ok := p.Args[name]
+	if !ok {
+		panic(fmt.Sprintf("spore: argument %q not present in publish message", name))
+	}
+	return val
+}
+
+// ArgIf returns the value of a named argument, or def if not present.
+func (p *PublishMessage) ArgIf(name string, def string) string {
+	if val, ok := p.Args[name]; ok {
+		return val
+	}
+	return def
+}
+
+// HasArg returns true if the named argument is present.
+func (p *PublishMessage) HasArg(name string) bool {
+	_, ok := p.Args[name]
+	return ok
+}
+
+// HasFlag returns true if the named flag is present.
+func (p *PublishMessage) HasFlag(name string) bool {
+	for _, f := range p.Flags {
+		if f == name {
+			return true
+		}
+	}
+	return false
+}
+
+// parsePublish parses a raw publish message line into a PublishMessage.
+//
+// Wire format: publish <topic> [key=value ...] [flag ...]
+//
+// The hub injects cast=<publisher> into the message before delivery. It is
+// extracted into the Cast field; all other key=value pairs go into Args and
+// bare tokens go into Flags.
+func parsePublish(raw string) (*PublishMessage, error) {
+	if !strings.HasPrefix(raw, "publish ") {
+		return nil, fmt.Errorf("not a publish message")
+	}
+
+	rest := strings.TrimPrefix(raw, "publish ")
+	parts := splitFields(rest)
+	if len(parts) == 0 {
+		return nil, fmt.Errorf("publish message missing topic")
+	}
+
+	msg := &PublishMessage{
+		Topic: parts[0],
+		Args:  make(map[string]string),
+		Flags: []string{},
+	}
+
+	for _, part := range parts[1:] {
+		if strings.Contains(part, "=") {
+			kv := strings.SplitN(part, "=", 2)
+			val := kv[1]
+			if len(val) >= 2 && val[0] == '"' && val[len(val)-1] == '"' {
+				val = val[1 : len(val)-1]
+			}
+			if kv[0] == "cast" {
+				msg.Cast = val
+			} else {
+				msg.Args[kv[0]] = val
+			}
+		} else {
+			msg.Flags = append(msg.Flags, part)
+		}
+	}
+
+	return msg, nil
+}
+
 func splitFields(s string) []string {
 	var fields []string
 	var current strings.Builder
