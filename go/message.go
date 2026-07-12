@@ -100,13 +100,7 @@ func (c *Call) Cancel() error {
 //	call.Error(ErrorCodeArgumentMissing, "timezone argument is required")
 func (c *Call) Error(code ErrorCode, what string) error {
 	response := c.formatResponsePrefix()
-
-	if strings.Contains(what, " ") {
-		response += fmt.Sprintf(" error code=%s what=\"%s\" node_error", string(code), what)
-	} else {
-		response += fmt.Sprintf(" error code=%s what=%s node_error", string(code), what)
-	}
-
+	response += " error code=" + string(code) + " " + formatArgValue("what", what) + " node_error"
 	_, err := c.conn.Write([]byte(response + "\n"))
 	return err
 }
@@ -119,13 +113,7 @@ func (c *Call) Error(code ErrorCode, what string) error {
 //	call.ErrorCustom("clock.err.invalid_timezone", "Unknown timezone: Fakezone")
 func (c *Call) ErrorCustom(code string, what string) error {
 	response := c.formatResponsePrefix()
-
-	if strings.Contains(what, " ") {
-		response += fmt.Sprintf(" custom_error code=%s what=\"%s\" node_error", code, what)
-	} else {
-		response += fmt.Sprintf(" custom_error code=%s what=%s node_error", code, what)
-	}
-
+	response += " custom_error code=" + code + " " + formatArgValue("what", what) + " node_error"
 	_, err := c.conn.Write([]byte(response + "\n"))
 	return err
 }
@@ -134,16 +122,92 @@ func (c *Call) ErrorCustom(code string, what string) error {
 //
 // [array] and {object} tokens already act as opaque delimiters in the Spore
 // tokenizer, so they are never wrapped in quotes regardless of whether they
-// contain spaces. Plain string values that contain spaces are wrapped in
-// double-quotes. All other values are sent as-is.
+// contain spaces. Plain string values that require quoting (space, tab,
+// newline, CR, backslash, or double-quote) are wrapped in double-quotes with
+// backslash escapes applied. All other values are sent as-is.
 func formatArgValue(k, v string) string {
 	if strings.HasPrefix(v, "[") || strings.HasPrefix(v, "{") {
 		return fmt.Sprintf("%s=%s", k, v)
 	}
-	if strings.Contains(v, " ") {
-		return fmt.Sprintf("%s=\"%s\"", k, v)
+	if wireNeedsQuoting(v) {
+		return fmt.Sprintf(`%s="%s"`, k, wireEscape(v))
 	}
 	return fmt.Sprintf("%s=%s", k, v)
+}
+
+// wireNeedsQuoting reports whether v must be wrapped in double-quotes on the
+// wire. Any character that is a token delimiter (space, tab) or that would
+// break the message framing (newline, CR) or that has special meaning inside
+// a quoted string (backslash, double-quote) requires quoting.
+func wireNeedsQuoting(v string) bool {
+	for i := 0; i < len(v); i++ {
+		switch v[i] {
+		case ' ', '\t', '\n', '\r', '\\', '"':
+			return true
+		}
+	}
+	return false
+}
+
+// wireEscape applies backslash escaping to the inner content of a
+// double-quoted wire value. The surrounding quotes are not included.
+func wireEscape(v string) string {
+	var b strings.Builder
+	b.Grow(len(v))
+	for i := 0; i < len(v); i++ {
+		switch v[i] {
+		case '\\':
+			b.WriteString(`\\`)
+		case '"':
+			b.WriteString(`\"`)
+		case '\n':
+			b.WriteString(`\n`)
+		case '\r':
+			b.WriteString(`\r`)
+		case '\t':
+			b.WriteString(`\t`)
+		default:
+			b.WriteByte(v[i])
+		}
+	}
+	return b.String()
+}
+
+// wireUnescape decodes backslash escape sequences within the inner content of
+// a double-quoted wire value (surrounding quotes already stripped).
+// Recognised sequences: \\ → \, \" → ", \n → newline, \r → CR, \t → tab.
+// Any other \X is preserved as-is.
+func wireUnescape(s string) string {
+	if !strings.ContainsRune(s, '\\') {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	i := 0
+	for i < len(s) {
+		if s[i] == '\\' && i+1 < len(s) {
+			switch s[i+1] {
+			case '\\':
+				b.WriteByte('\\')
+			case '"':
+				b.WriteByte('"')
+			case 'n':
+				b.WriteByte('\n')
+			case 'r':
+				b.WriteByte('\r')
+			case 't':
+				b.WriteByte('\t')
+			default:
+				b.WriteByte('\\')
+				b.WriteByte(s[i+1])
+			}
+			i += 2
+		} else {
+			b.WriteByte(s[i])
+			i++
+		}
+	}
+	return b.String()
 }
 
 // formatResponsePrefix builds the ~handle:subject or subject prefix.
@@ -325,7 +389,7 @@ func parseResponse(raw string) (*Response, error) {
 			kv := strings.SplitN(part, "=", 2)
 			val := kv[1]
 			if len(val) >= 2 && val[0] == '"' && val[len(val)-1] == '"' {
-				val = val[1 : len(val)-1]
+				val = wireUnescape(val[1 : len(val)-1])
 			}
 			resp.Args[kv[0]] = val
 		}
@@ -512,7 +576,7 @@ func parseWitness(raw string) (*WitnessMessage, error) {
 			kv := strings.SplitN(part, "=", 2)
 			val := kv[1]
 			if len(val) >= 2 && val[0] == '"' && val[len(val)-1] == '"' {
-				val = val[1 : len(val)-1]
+				val = wireUnescape(val[1 : len(val)-1])
 			}
 			switch kv[0] {
 			case "spore_time":
@@ -626,7 +690,7 @@ func parsePublish(raw string) (*PublishMessage, error) {
 			kv := strings.SplitN(part, "=", 2)
 			val := kv[1]
 			if len(val) >= 2 && val[0] == '"' && val[len(val)-1] == '"' {
-				val = val[1 : len(val)-1]
+				val = wireUnescape(val[1 : len(val)-1])
 			}
 			if kv[0] == "cast" {
 				msg.Cast = val
@@ -653,6 +717,12 @@ func splitFields(s string) []string {
 		case ch == '"' && !inDouble:
 			inDouble = true
 			current.WriteByte(ch)
+		case ch == '\\' && inDouble && i+1 < len(s):
+			// Backslash escape inside a double-quoted string: consume both
+			// characters so that \" does not prematurely close the string.
+			current.WriteByte(ch)
+			current.WriteByte(s[i+1])
+			i++
 		case ch == '"' && inDouble:
 			inDouble = false
 			current.WriteByte(ch)

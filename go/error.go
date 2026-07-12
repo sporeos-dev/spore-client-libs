@@ -53,6 +53,23 @@ const (
 	ErrorCodeHandleExpired ErrorCode = "HandleExpired"
 )
 
+// HubError is returned by Listen when the hub explicitly rejects the
+// connection after the handshake — for example when manifest or binary
+// verification fails. Unlike a transient disconnect, a HubError signals
+// that reconnecting without taking corrective action (e.g. reinstalling
+// the node) will not resolve the problem.
+type HubError struct {
+	Code string
+	What string
+}
+
+func (e *HubError) Error() string {
+	if e.What != "" {
+		return "hub rejected connection: " + e.Code + ": " + e.What
+	}
+	return "hub rejected connection: " + e.Code
+}
+
 // ErrorOrigin identifies where an error originated.
 // Exactly one origin flag is present on every error response.
 type ErrorOrigin string

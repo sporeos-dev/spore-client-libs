@@ -117,6 +117,104 @@ func main() {
 
 ---
 
+## Common Patterns
+
+### Handling an incoming call
+
+```go
+client.HandleRequest("get_time", func(call *spore.Call) {
+    tz := call.ArgOr("timezone", "UTC")
+    call.Reply(map[string]string{"time": "2026-03-13T14:32:00Z", "timezone": tz})
+})
+```
+
+### Returning errors
+
+```go
+client.HandleRequest("get_time", func(call *spore.Call) {
+    if !call.HasArg("timezone") {
+        call.Error(spore.ErrorCodeArgumentMissing, "timezone is required")
+        return
+    }
+    // node-defined error code declared in the manifest
+    call.ErrorCustom("clock.err.invalid_timezone", "Unknown timezone: Fakezone")
+})
+```
+
+### Cancel (no result, not an error)
+
+```go
+client.HandleRequest("open_dialog", func(call *spore.Call) {
+    // user dismissed the dialog — clean non-result
+    call.Cancel()
+})
+```
+
+### Calling another node and waiting for the response
+
+```go
+resp, err := client.SendAndWait("clock.get_time timezone=UTC ~req1", 5000)
+if err != nil {
+    log.Fatal(err)
+}
+if !resp.OK {
+    log.Fatalf("error: %s — %s", resp.ErrCode, resp.ErrWhat)
+}
+fmt.Println("time:", resp.Arg("time"))
+```
+
+### Calling another node from inside a handler (goroutine required)
+
+```go
+client.HandleRequest("what_time", func(call *spore.Call) {
+    go func() {
+        resp, err := client.SendAndWait("clock.get_time timezone=UTC ~inner1", 5000)
+        if err != nil || !resp.OK {
+            call.Error(spore.ErrorCodeUpstream, "clock unavailable")
+            return
+        }
+        call.Reply(map[string]string{"time": resp.Arg("time")})
+    }()
+})
+```
+
+### Fire-and-forget with an async response handler
+
+```go
+client.HandleResponse("get_time", func(resp *spore.Response) {
+    if resp.OK {
+        fmt.Println("time:", resp.Arg("time"))
+    }
+})
+
+client.Send("clock.get_time timezone=UTC ~fire1")
+// response is delivered to HandleResponse when Listen() reads it
+```
+
+### Subscribe to a topic
+
+```go
+if err := client.Subscribe("sensors.temperature", func(msg *spore.PublishMessage) {
+    fmt.Println("temp:", msg.Arg("value"), msg.ArgOr("unit", "?"))
+}, 5000); err != nil {
+    log.Fatal(err)
+}
+// later:
+client.Unsubscribe("sensors.temperature", 5000)
+```
+
+### Observe all traffic (witness node)
+
+```go
+client.HandleWitness(func(msg *spore.WitnessMessage) {
+    if msg.Kind == spore.WitnessKindOutgoing {
+        fmt.Printf("[%d] → %s\n", msg.SporeTime, msg.Subject)
+    }
+})
+```
+
+---
+
 ## API Reference
 
 ### Creating a Client

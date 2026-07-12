@@ -214,6 +214,17 @@ func (c *Client) Listen() error {
 			continue
 		}
 
+		// A bare "error code=... what=..." line (no ~ handle prefix) is the
+		// hub's post-handshake rejection format (rejectAfterHandshake). Treat
+		// it as a permanent HubError so the caller can decide not to retry.
+		if strings.HasPrefix(raw, "error ") {
+			call, _ := parseCall(raw)
+			return &HubError{
+				Code: call.ArgIf("code", "ConnectionFailure"),
+				What: call.ArgIf("what", ""),
+			}
+		}
+
 		call, err := parseCall(raw)
 		if err != nil {
 			continue
