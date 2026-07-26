@@ -74,7 +74,7 @@ func (c *Call) Reply(args map[string]string) error {
 	response := c.formatResponsePrefix()
 
 	for k, v := range args {
-		response += " " + formatArgValue(k, v)
+		response += " ok " + formatArgValue(k, v)
 	}
 
 	_, err := c.conn.Write([]byte(response + "\n"))
