@@ -1,0 +1,41 @@
+# Toolchain: native Apple Clang on macOS (Apple Silicon)
+# Requires: Xcode Command Line Tools (xcode-select --install)
+
+ROOT  := $(abspath ..)
+DIST  := $(ROOT)/dist
+LIB   := libspore_parser.a
+LIB_D := libspore_parser_d.a
+SRCS  := $(wildcard source/*.cpp)
+
+CXX   := clang++
+AR    := ar
+
+CXXFLAGS_COMMON  := -std=c++17 -arch arm64 -Iinclude -Isource
+CXXFLAGS_RELEASE := $(CXXFLAGS_COMMON) -O2 -DNDEBUG
+CXXFLAGS_DEBUG   := $(CXXFLAGS_COMMON) -g -O0 -DDEBUG
+
+RELEASE_OBJS := $(patsubst source/%.cpp,source/%.o,$(SRCS))
+DEBUG_OBJS   := $(patsubst source/%.cpp,source/%_d.o,$(SRCS))
+
+.PHONY: release debug clean
+
+release: $(DIST)/$(LIB)
+debug:   $(DIST)/$(LIB_D)
+
+$(DIST)/$(LIB): $(RELEASE_OBJS) | $(DIST)
+	$(AR) rcs $@ $^
+
+$(DIST)/$(LIB_D): $(DEBUG_OBJS) | $(DIST)
+	$(AR) rcs $@ $^
+
+source/%.o: source/%.cpp
+	$(CXX) $(CXXFLAGS_RELEASE) -c $< -o $@
+
+source/%_d.o: source/%.cpp
+	$(CXX) $(CXXFLAGS_DEBUG) -c $< -o $@
+
+$(DIST):
+	@mkdir -p $@
+
+clean:
+	@rm -f $(DIST)/$(LIB) $(DIST)/$(LIB_D) $(RELEASE_OBJS) $(DEBUG_OBJS)

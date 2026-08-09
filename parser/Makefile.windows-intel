@@ -1,0 +1,41 @@
+# Toolchain: MinGW-w64 x86_64
+# Install on macOS: brew install mingw-w64
+
+ROOT  := $(abspath ..)
+DIST  := $(ROOT)/dist/windows-intel
+LIB   := libspore_parser.a
+SRCS  := $(wildcard source/*.cpp)
+
+CXX   := x86_64-w64-mingw32-g++
+AR    := x86_64-w64-mingw32-ar
+
+CXXFLAGS_COMMON  := -std=c++17 -Iinclude -Isource -static-libstdc++ -static-libgcc
+CXXFLAGS_RELEASE := $(CXXFLAGS_COMMON) -O2 -DNDEBUG
+CXXFLAGS_DEBUG   := $(CXXFLAGS_COMMON) -g -O0 -DDEBUG
+
+RELEASE_OBJS := $(patsubst source/%.cpp,source/%.o,$(SRCS))
+DEBUG_OBJS   := $(patsubst source/%.cpp,source/%_d.o,$(SRCS))
+
+.PHONY: release debug clean
+
+release: $(DIST)/release/$(LIB)
+debug:   $(DIST)/debug/$(LIB)
+
+$(DIST)/release/$(LIB): $(RELEASE_OBJS) | $(DIST)/release
+	$(AR) rcs $@ $^
+
+$(DIST)/debug/$(LIB): $(DEBUG_OBJS) | $(DIST)/debug
+	$(AR) rcs $@ $^
+
+source/%.o: source/%.cpp
+	$(CXX) $(CXXFLAGS_RELEASE) -c $< -o $@
+
+source/%_d.o: source/%.cpp
+	$(CXX) $(CXXFLAGS_DEBUG) -c $< -o $@
+
+$(DIST)/release $(DIST)/debug:
+	@mkdir -p $@
+
+clean:
+	@rm -rf $(DIST)
+	@rm -f $(RELEASE_OBJS) $(DEBUG_OBJS)

@@ -1,0 +1,34 @@
+# Builds and runs tests natively (host platform only).
+# Cross-compiled targets cannot be executed on the build machine.
+#
+# Requires: Xcode Command Line Tools
+
+ROOT     := $(abspath ..)
+GTEST    := $(ROOT)/../libs/googletest/googletest
+
+TEST_BIN := $(ROOT)/dist/parser_test
+
+CXX      := clang++
+CXXFLAGS := -std=c++17 -arch arm64 \
+            -Iinclude -Isource \
+            -I$(GTEST)/include
+
+SRCS     := $(wildcard source/*.cpp) \
+            $(GTEST)/src/gtest-all.cc \
+            $(wildcard test/*.cpp)
+
+FILTER   ?=
+
+.PHONY: test clean-test
+
+test: $(TEST_BIN)
+	@$(TEST_BIN) $(if $(FILTER),--gtest_filter=$(FILTER),)
+
+$(TEST_BIN): $(SRCS) | $(ROOT)/dist
+	$(CXX) $(CXXFLAGS) -I$(GTEST) $^ -o $@ -lpthread
+
+$(ROOT)/dist:
+	@mkdir -p $@
+
+clean-test:
+	@rm -f $(TEST_BIN)
