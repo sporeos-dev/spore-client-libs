@@ -1,5 +1,5 @@
-#ifndef SPORE_CLIENT_H
-#define SPORE_CLIENT_H
+#ifndef SPORE_C_H
+#define SPORE_C_H
 
 #include <stddef.h>
 #include <stdbool.h>
@@ -59,6 +59,9 @@ extern "C"
 
     // main event loop
     void spore_client_listen(spore_client_t* hClient);
+
+    // raw wire send
+    void spore_client_send_raw(spore_client_t* hClient, const char* pData, size_t sz);
 
     //
     //
@@ -194,4 +197,4 @@ extern "C"
 }
 #endif
 
-#endif  // SPORE_CLIENT_H
+#endif  // SPORE_C_H

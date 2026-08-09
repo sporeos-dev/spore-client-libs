@@ -6,24 +6,30 @@
 #include "witness.h"
 #include "publish.h"
 
-// Full definitions for all opaque types forward-declared in spore_client.h.
+// Full definitions for all opaque types forward-declared in spore_c.h.
 
 struct spore_client_t
 {
-    spore::client client;
+    spore::Client client;
 };
 
 // Heap-allocated token returned by register_*_handler; identifies one registration.
 struct spore_handler_t
 {
-    enum class type_t { request, response, witness, publish } type;
+    enum class type_t
+    {
+        request,
+        response,
+        witness,
+        publish
+    } type;
     int id;
     union
     {
-        spore_request_fn  onRequest;
+        spore_request_fn onRequest;
         spore_response_fn onResponse;
-        spore_witness_fn  onWitness;
-        spore_publish_fn  onPublish;
+        spore_witness_fn onWitness;
+        spore_publish_fn onPublish;
     };
 };
 

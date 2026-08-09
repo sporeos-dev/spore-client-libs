@@ -3,46 +3,60 @@
 #include <cstring>
 
 #if defined(_WIN32)
-#include <winsock2.h>
-#include <afunix.h>
-#pragma comment(lib, "ws2_32.lib")
-#define SPORE_CLOSE(fd) closesocket(fd)
-#define SPORE_WRITE(fd, buf, len) send(fd, buf, (int)(len), 0)
-#define SPORE_READ(fd, buf, len)  recv(fd, buf, (int)(len), 0)
+    #include <winsock2.h>
+    #include <afunix.h>
+    #pragma comment(lib, "ws2_32.lib")
+    #define SPORE_CLOSE(fd) closesocket(fd)
+    #define SPORE_WRITE(fd, buf, len) send(fd, buf, (int)(len), 0)
+    #define SPORE_READ(fd, buf, len) recv(fd, buf, (int)(len), 0)
 #else
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <unistd.h>
-#define SPORE_CLOSE(fd) ::close(fd)
-#define SPORE_WRITE(fd, buf, len) ::write(fd, buf, len)
-#define SPORE_READ(fd, buf, len)  ::read(fd, buf, len)
+    #include <sys/socket.h>
+    #include <sys/un.h>
+    #include <unistd.h>
+    #define SPORE_CLOSE(fd) ::close(fd)
+    #define SPORE_WRITE(fd, buf, len) ::write(fd, buf, len)
+    #define SPORE_READ(fd, buf, len) ::read(fd, buf, len)
 #endif
 
 namespace spore
 {
-    client::client(std::string_view id) : nodeId(id) {}
-
-    client::~client()
+    Client::Client(std::string_view id) : nodeId(id)
     {
-        disconnect();
-        for (auto* h : requestHandlers)  delete h;
-        for (auto* h : responseHandlers) delete h;
-        for (auto* h : witnessHandlers)  delete h;
-        for (auto* h : publishHandlers)  delete h;
     }
 
-    void client::error(std::string_view code, std::string_view what)
+    Client::~Client()
+    {
+        disconnect();
+        for (auto* h : requestHandlers) delete h;
+        for (auto* h : responseHandlers) delete h;
+        for (auto* h : witnessHandlers) delete h;
+        for (auto* h : publishHandlers) delete h;
+    }
+
+    void Client::error(std::string_view code, std::string_view what)
     {
         errorCode = code;
         errorWhat = what;
     }
 
-    bool client::hasError() const              { return !errorCode.empty(); }
-    std::string_view client::getErrorCode() const { return errorCode; }
-    std::string_view client::getErrorWhat() const { return errorWhat; }
-    bool client::isConnected() const           { return connected; }
+    bool Client::hasError() const
+    {
+        return !errorCode.empty();
+    }
+    std::string_view Client::getErrorCode() const
+    {
+        return errorCode;
+    }
+    std::string_view Client::getErrorWhat() const
+    {
+        return errorWhat;
+    }
+    bool Client::isConnected() const
+    {
+        return connected;
+    }
 
-    std::string client::defaultSocketPath()
+    std::string Client::defaultSocketPath()
     {
 #if defined(__APPLE__)
         return "/Library/Application Support/spore-os/spore.sock";
@@ -58,7 +72,7 @@ namespace spore
 #endif
     }
 
-    void client::connect()
+    void Client::connect()
     {
         errorCode.clear();
         errorWhat.clear();
@@ -101,15 +115,18 @@ namespace spore
         connected = true;
     }
 
-    void client::handshake()
+    void Client::handshake()
     {
         // Set 5 second read timeout (matches Go handshakeTimeout).
 #if defined(_WIN32)
         DWORD tv = 5000;
-        setsockopt(socketFd, SOL_SOCKET, SO_RCVTIMEO,
-                   reinterpret_cast<const char*>(&tv), sizeof(tv));
+        setsockopt(socketFd,
+                   SOL_SOCKET,
+                   SO_RCVTIMEO,
+                   reinterpret_cast<const char*>(&tv),
+                   sizeof(tv));
 #else
-        struct timeval tv { 5, 0 };
+        struct timeval tv{ 5, 0 };
         setsockopt(socketFd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 #endif
 
@@ -122,7 +139,7 @@ namespace spore
 
         // Read until newline, up to 63 bytes.
         char buf[64] = {};
-        size_t pos   = 0;
+        size_t pos = 0;
         while (pos < sizeof(buf) - 1)
         {
             auto n = SPORE_READ(socketFd, buf + pos, 1);
@@ -139,8 +156,11 @@ namespace spore
         // Clear timeout.
 #if defined(_WIN32)
         tv = 0;
-        setsockopt(socketFd, SOL_SOCKET, SO_RCVTIMEO,
-                   reinterpret_cast<const char*>(&tv), sizeof(tv));
+        setsockopt(socketFd,
+                   SOL_SOCKET,
+                   SO_RCVTIMEO,
+                   reinterpret_cast<const char*>(&tv),
+                   sizeof(tv));
 #else
         tv = { 0, 0 };
         setsockopt(socketFd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
@@ -154,7 +174,7 @@ namespace spore
             error("HandshakeFailed", response);
     }
 
-    void client::disconnect()
+    void Client::disconnect()
     {
         errorCode.clear();
         errorWhat.clear();
@@ -170,47 +190,47 @@ namespace spore
 
     // --- Handler registration ---
 
-    spore_handler_t* client::registerRequestHandler(spore_request_fn fn)
+    spore_handler_t* Client::registerRequestHandler(spore_request_fn fn)
     {
-        auto* h     = new spore_handler_t{};
-        h->type     = spore_handler_t::type_t::request;
-        h->id       = nextId++;
+        auto* h = new spore_handler_t{};
+        h->type = spore_handler_t::type_t::request;
+        h->id = nextId++;
         h->onRequest = fn;
         requestHandlers.push_back(h);
         return h;
     }
 
-    spore_handler_t* client::registerResponseHandler(spore_response_fn fn)
+    spore_handler_t* Client::registerResponseHandler(spore_response_fn fn)
     {
-        auto* h      = new spore_handler_t{};
-        h->type      = spore_handler_t::type_t::response;
-        h->id        = nextId++;
+        auto* h = new spore_handler_t{};
+        h->type = spore_handler_t::type_t::response;
+        h->id = nextId++;
         h->onResponse = fn;
         responseHandlers.push_back(h);
         return h;
     }
 
-    spore_handler_t* client::registerWitnessHandler(spore_witness_fn fn)
+    spore_handler_t* Client::registerWitnessHandler(spore_witness_fn fn)
     {
-        auto* h      = new spore_handler_t{};
-        h->type      = spore_handler_t::type_t::witness;
-        h->id        = nextId++;
+        auto* h = new spore_handler_t{};
+        h->type = spore_handler_t::type_t::witness;
+        h->id = nextId++;
         h->onWitness = fn;
         witnessHandlers.push_back(h);
         return h;
     }
 
-    spore_handler_t* client::registerPublishHandler(spore_publish_fn fn)
+    spore_handler_t* Client::registerPublishHandler(spore_publish_fn fn)
     {
-        auto* h      = new spore_handler_t{};
-        h->type      = spore_handler_t::type_t::publish;
-        h->id        = nextId++;
+        auto* h = new spore_handler_t{};
+        h->type = spore_handler_t::type_t::publish;
+        h->id = nextId++;
         h->onPublish = fn;
         publishHandlers.push_back(h);
         return h;
     }
 
-    void client::unregisterHandler(spore_handler_t* hHandler)
+    void Client::unregisterHandler(spore_handler_t* hHandler)
     {
         if (!hHandler)
             return;
@@ -227,67 +247,112 @@ namespace spore
 
         switch (hHandler->type)
         {
-            case spore_handler_t::type_t::request:  erase(requestHandlers);  break;
-            case spore_handler_t::type_t::response: erase(responseHandlers); break;
-            case spore_handler_t::type_t::witness:  erase(witnessHandlers);  break;
-            case spore_handler_t::type_t::publish:  erase(publishHandlers);  break;
+            case spore_handler_t::type_t::request:
+                erase(requestHandlers);
+                break;
+            case spore_handler_t::type_t::response:
+                erase(responseHandlers);
+                break;
+            case spore_handler_t::type_t::witness:
+                erase(witnessHandlers);
+                break;
+            case spore_handler_t::type_t::publish:
+                erase(publishHandlers);
+                break;
         }
     }
 
     // --- Send stubs ---
 
-    void client::send(const spore_request_t* /*hRequest*/)
+    void Client::send(const spore_request_t* /*hRequest*/)
     {
         errorCode.clear();
         errorWhat.clear();
-        if (!connected) { error("NotConnected", "client is not connected"); return; }
+        if (!connected)
+        {
+            error("NotConnected", "client is not connected");
+            return;
+        }
         // TODO: serialise request to Spore protocol and write to socket
         error("NotImplemented", "send not yet implemented");
     }
 
-    void client::sendResponse(const spore_response_t* /*hResponse*/)
+    void Client::sendResponse(const spore_response_t* /*hResponse*/)
     {
         errorCode.clear();
         errorWhat.clear();
-        if (!connected) { error("NotConnected", "client is not connected"); return; }
+        if (!connected)
+        {
+            error("NotConnected", "client is not connected");
+            return;
+        }
         // TODO: serialise ok response and write to socket
         error("NotImplemented", "sendResponse not yet implemented");
     }
 
-    void client::sendResponseError(const spore_response_error_t* /*hError*/)
+    void Client::sendResponseError(const spore_response_error_t* /*hError*/)
     {
         errorCode.clear();
         errorWhat.clear();
-        if (!connected) { error("NotConnected", "client is not connected"); return; }
+        if (!connected)
+        {
+            error("NotConnected", "client is not connected");
+            return;
+        }
         // TODO: serialise error response and write to socket
         error("NotImplemented", "sendResponseError not yet implemented");
     }
 
-    void client::sendWitness(const spore_witness_t* /*hWitness*/)
+    void Client::sendWitness(const spore_witness_t* /*hWitness*/)
     {
         errorCode.clear();
         errorWhat.clear();
-        if (!connected) { error("NotConnected", "client is not connected"); return; }
+        if (!connected)
+        {
+            error("NotConnected", "client is not connected");
+            return;
+        }
         // TODO: serialise witness and write to socket
         error("NotImplemented", "sendWitness not yet implemented");
     }
 
-    void client::sendPublish(const spore_publish_t* /*hPublish*/)
+    void Client::sendPublish(const spore_publish_t* /*hPublish*/)
     {
         errorCode.clear();
         errorWhat.clear();
-        if (!connected) { error("NotConnected", "client is not connected"); return; }
+        if (!connected)
+        {
+            error("NotConnected", "client is not connected");
+            return;
+        }
         // TODO: serialise publish and write to socket
         error("NotImplemented", "sendPublish not yet implemented");
     }
 
-    void client::listen()
+    void Client::listen()
     {
         errorCode.clear();
         errorWhat.clear();
-        if (!connected) { error("NotConnected", "client is not connected"); return; }
+        if (!connected)
+        {
+            error("NotConnected", "client is not connected");
+            return;
+        }
         // TODO: read loop — parse lines with the parser library, dispatch to handlers
         error("NotImplemented", "listen not yet implemented");
+    }
+
+    void Client::sendRaw(const char* data, size_t len)
+    {
+        errorCode.clear();
+        errorWhat.clear();
+        if (!connected)
+        {
+            error("NotConnected", "client is not connected");
+            return;
+        }
+        if (SPORE_WRITE(socketFd, data, static_cast<int>(len)) < 0)
+            error("SendFailed", "failed to write to socket");
     }
 
 }  // namespace spore

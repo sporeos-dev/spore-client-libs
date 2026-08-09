@@ -6,7 +6,7 @@
 ROOT     := $(abspath ..)
 GTEST    := $(ROOT)/../libs/googletest/googletest
 
-TEST_BIN := $(ROOT)/dist/spore_client_test
+TEST_BIN := $(ROOT)/dist/spore_c_test
 
 CXX      := clang++
 CXXFLAGS := -std=c++17 -arch arm64 \

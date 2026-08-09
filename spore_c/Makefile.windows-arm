@@ -6,9 +6,9 @@
 ROOT  := $(abspath ..)
 DIST  := $(ROOT)/dist/windows-arm
 
-LIB_STATIC   := libspore_client.a
-LIB_STATIC_D := libspore_client_d.a
-LIB_SHARED   := spore_client.dll
+LIB_STATIC   := libspore_c.a
+LIB_STATIC_D := libspore_c_d.a
+LIB_SHARED   := spore_c.dll
 LIB_SHARED_D := spore_client_d.dll
 
 SRCS := $(wildcard source/*.cpp)

@@ -1,12 +1,12 @@
 #pragma once
 
-#include "spore_client.h"
+#include "spore_c.h"
 #include <string>
 #include <string_view>
 #include <vector>
 
 #if defined(_WIN32)
-#include <winsock2.h>
+    #include <winsock2.h>
 using socket_t = SOCKET;
 static constexpr socket_t kInvalidSocket = INVALID_SOCKET;
 #else
@@ -16,11 +16,11 @@ static constexpr socket_t kInvalidSocket = -1;
 
 namespace spore
 {
-    class client
+    class Client
     {
     public:
-        explicit client(std::string_view nodeId);
-        ~client();
+        explicit Client(std::string_view nodeId);
+        ~Client();
 
         bool isConnected() const;
         bool hasError() const;
@@ -43,6 +43,7 @@ namespace spore
         void sendPublish(const spore_publish_t* hPublish);
 
         void listen();
+        void sendRaw(const char* data, size_t len);
 
     private:
         void error(std::string_view code, std::string_view what);
@@ -50,9 +51,9 @@ namespace spore
         static std::string defaultSocketPath();
 
         std::string nodeId;
-        socket_t    socketFd  = kInvalidSocket;
-        bool        connected = false;
-        int         nextId    = 0;
+        socket_t socketFd = kInvalidSocket;
+        bool connected = false;
+        int nextId = 0;
         std::string errorCode;
         std::string errorWhat;
 

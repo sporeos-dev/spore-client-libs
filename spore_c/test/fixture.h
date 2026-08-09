@@ -1,7 +1,7 @@
 #pragma once
 
 #include <gtest/gtest.h>
-#include "spore_client.h"
+#include "spore_c.h"
 
 class Fixture : public ::testing::Test
 {
