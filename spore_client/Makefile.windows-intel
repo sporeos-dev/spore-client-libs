@@ -1,0 +1,54 @@
+# Toolchain: MinGW-w64 x86_64
+# Install on macOS: brew install mingw-w64
+
+ROOT  := $(abspath ..)
+DIST  := $(ROOT)/dist/windows-intel
+
+LIB_STATIC   := libspore_client.a
+LIB_STATIC_D := libspore_client_d.a
+LIB_SHARED   := spore_client.dll
+LIB_SHARED_D := spore_client_d.dll
+
+SRCS := $(wildcard source/*.cpp)
+
+CXX  := x86_64-w64-mingw32-g++
+AR   := x86_64-w64-mingw32-ar
+
+CXXFLAGS_COMMON  := -std=c++17 -fPIC -Iinclude -Isource \
+                    -static-libstdc++ -static-libgcc
+CXXFLAGS_RELEASE := $(CXXFLAGS_COMMON) -O2 -DNDEBUG
+CXXFLAGS_DEBUG   := $(CXXFLAGS_COMMON) -g -O0 -DDEBUG
+
+RELEASE_OBJS := $(patsubst source/%.cpp,source/%.o,$(SRCS))
+DEBUG_OBJS   := $(patsubst source/%.cpp,source/%_d.o,$(SRCS))
+
+.PHONY: release debug clean
+
+release: $(DIST)/$(LIB_STATIC) $(DIST)/$(LIB_SHARED)
+debug:   $(DIST)/$(LIB_STATIC_D) $(DIST)/$(LIB_SHARED_D)
+
+$(DIST)/$(LIB_STATIC): $(RELEASE_OBJS) | $(DIST)
+	$(AR) rcs $@ $^
+
+$(DIST)/$(LIB_SHARED): $(RELEASE_OBJS) | $(DIST)
+	$(CXX) -shared -o $@ $^
+
+$(DIST)/$(LIB_STATIC_D): $(DEBUG_OBJS) | $(DIST)
+	$(AR) rcs $@ $^
+
+$(DIST)/$(LIB_SHARED_D): $(DEBUG_OBJS) | $(DIST)
+	$(CXX) -shared -o $@ $^
+
+source/%.o: source/%.cpp
+	$(CXX) $(CXXFLAGS_RELEASE) -c $< -o $@
+
+source/%_d.o: source/%.cpp
+	$(CXX) $(CXXFLAGS_DEBUG) -c $< -o $@
+
+$(DIST):
+	@mkdir -p $@
+
+clean:
+	@rm -f $(DIST)/$(LIB_STATIC) $(DIST)/$(LIB_STATIC_D) \
+	       $(DIST)/$(LIB_SHARED) $(DIST)/$(LIB_SHARED_D) \
+	       $(RELEASE_OBJS) $(DEBUG_OBJS)
