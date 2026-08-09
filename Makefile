@@ -1,8 +1,10 @@
-GO_DIR := go
+GO_DIR     := go
+PARSER_DIR := parser
+CLIENT_DIR := spore_client
 
 .DEFAULT_GOAL := check
 
-.PHONY: check analyze setup
+.PHONY: check analyze setup release debug clean test cross
 
 check:
 	@echo "==> Cleaning build and test cache..."
@@ -14,6 +16,42 @@ check:
 	@echo "==> Testing..."
 	@cd $(GO_DIR) && go test ./...
 	@echo "==> All checks passed."
+
+release:
+	@echo "==> Building Go..."
+	@cd $(GO_DIR) && go build ./...
+	@echo "==> Building parser (native)..."
+	@$(MAKE) -C $(PARSER_DIR) -f Makefile.macos-arm release
+	@echo "==> Building spore_client (native)..."
+	@$(MAKE) -C $(CLIENT_DIR) -f Makefile.macos-arm release
+	@echo "==> Running tests..."
+	@$(MAKE) -C $(PARSER_DIR) test
+	@$(MAKE) -C $(CLIENT_DIR) test
+	@echo "==> Done."
+
+cross:
+	@echo "==> Building parser (all platforms)..."
+	@$(MAKE) -C $(PARSER_DIR) release
+	@echo "==> Building spore_client (all platforms)..."
+	@$(MAKE) -C $(CLIENT_DIR) release
+
+debug:
+	@echo "==> Building parser (native, debug)..."
+	@$(MAKE) -C $(PARSER_DIR) -f Makefile.macos-arm debug
+	@echo "==> Building spore_client (native, debug)..."
+	@$(MAKE) -C $(CLIENT_DIR) -f Makefile.macos-arm debug
+
+clean:
+	@echo "==> Cleaning parser builds..."
+	@$(MAKE) -C $(PARSER_DIR) clean
+	@echo "==> Cleaning spore_client builds..."
+	@$(MAKE) -C $(CLIENT_DIR) clean
+
+test:
+	@echo "==> Running parser tests..."
+	@$(MAKE) -C $(PARSER_DIR) test
+	@echo "==> Running spore_client tests..."
+	@$(MAKE) -C $(CLIENT_DIR) test
 
 analyze:
 	@echo "==> Running tests with race detector..."
