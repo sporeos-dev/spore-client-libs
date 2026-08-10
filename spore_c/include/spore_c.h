@@ -87,6 +87,15 @@ extern "C"
 
     // send
     void spore_request_send(spore_client_t* hClient, const spore_request_t* hRequest);
+    bool spore_request_send_and_wait(spore_client_t* hClient,
+                                     const spore_request_t* hRequest,
+                                     spore_response_t** phResponse,
+                                     spore_response_error_t** phError,
+                                     int timeout_ms);
+
+    // serialize
+    void spore_request_serialize(spore_request_t* hRequest);
+    const char* spore_request_get_serialized(const spore_request_t* hRequest);
 
     //
     //
@@ -113,6 +122,10 @@ extern "C"
 
     // send
     void spore_response_send(spore_client_t* hClient, const spore_response_t* hResponse);
+
+    // serialize
+    void spore_response_serialize(spore_response_t* hResponse);
+    const char* spore_response_get_serialized(const spore_response_t* hResponse);
 
     //
     //
@@ -147,6 +160,10 @@ extern "C"
     // send
     void spore_response_error_send(spore_client_t* hClient, const spore_response_error_t* hError);
 
+    // serialize
+    void spore_response_error_serialize(spore_response_error_t* hError);
+    const char* spore_response_error_get_serialized(const spore_response_error_t* hError);
+
     //
     //
     // witness
@@ -170,6 +187,10 @@ extern "C"
     // send
     void spore_witness_send(spore_client_t* hClient, const spore_witness_t* hWitness);
 
+    // serialize
+    void spore_witness_serialize(spore_witness_t* hWitness);
+    const char* spore_witness_get_serialized(const spore_witness_t* hWitness);
+
     //
     //
     // publish
@@ -192,6 +213,10 @@ extern "C"
 
     // send
     void spore_publish_send(spore_client_t* hClient, const spore_publish_t* hPublish);
+
+    // serialize
+    void spore_publish_serialize(spore_publish_t* hPublish);
+    const char* spore_publish_get_serialized(const spore_publish_t* hPublish);
 
 #ifdef __cplusplus
 }

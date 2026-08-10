@@ -1,9 +1,11 @@
 #pragma once
 
 #include "spore_c.h"
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <vector>
+#include <map>
 
 #if defined(_WIN32)
     #include <winsock2.h>
@@ -37,6 +39,10 @@ namespace spore
         void unregisterHandler(spore_handler_t* hHandler);
 
         void send(const spore_request_t* hRequest);
+        void sendAndWait(const spore_request_t* hRequest,
+                         spore_response_t** phResponse,
+                         spore_response_error_t** phError,
+                         int timeout_ms);
         void sendResponse(const spore_response_t* hResponse);
         void sendResponseError(const spore_response_error_t* hError);
         void sendWitness(const spore_witness_t* hWitness);
@@ -45,9 +51,12 @@ namespace spore
         void listen();
         void sendRaw(const char* data, size_t len);
 
+        spore_client_t* self = nullptr;  // back-pointer set by spore_client_create
+
     private:
         void error(std::string_view code, std::string_view what);
         void handshake();
+        void writeRaw(const char* data, size_t len);  // mutex-protected socket write
         static std::string defaultSocketPath();
 
         std::string nodeId;
@@ -57,10 +66,16 @@ namespace spore
         std::string errorCode;
         std::string errorWhat;
 
+        std::mutex writeMu;
+
         std::vector<spore_handler_t*> requestHandlers;
         std::vector<spore_handler_t*> responseHandlers;
         std::vector<spore_handler_t*> witnessHandlers;
         std::vector<spore_handler_t*> publishHandlers;
+
+        std::mutex waitingMu;
+        std::map<std::string, std::pair<spore_response_t*, spore_response_error_t*>> waitingFor;
+        std::condition_variable waitingCv;
     };
 
 }  // namespace spore

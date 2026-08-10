@@ -1,6 +1,9 @@
 #include "defs.h"
+#include "spore_parser.h"
 #include <algorithm>
+#include <chrono>
 #include <cstring>
+#include <string>
 
 #if defined(_WIN32)
     #include <winsock2.h>
@@ -262,22 +265,16 @@ namespace spore
         }
     }
 
-    // --- Send stubs ---
+    // --- Wire sends ---
 
-    void Client::send(const spore_request_t* /*hRequest*/)
+    void Client::writeRaw(const char* data, size_t len)
     {
-        errorCode.clear();
-        errorWhat.clear();
-        if (!connected)
-        {
-            error("NotConnected", "client is not connected");
-            return;
-        }
-        // TODO: serialise request to Spore protocol and write to socket
-        error("NotImplemented", "send not yet implemented");
+        std::lock_guard<std::mutex> lk(writeMu);
+        if (SPORE_WRITE(socketFd, data, static_cast<int>(len)) < 0)
+            error("SendFailed", "failed to write to socket");
     }
 
-    void Client::sendResponse(const spore_response_t* /*hResponse*/)
+    void Client::send(const spore_request_t* hRequest)
     {
         errorCode.clear();
         errorWhat.clear();
@@ -286,11 +283,21 @@ namespace spore
             error("NotConnected", "client is not connected");
             return;
         }
-        // TODO: serialise ok response and write to socket
-        error("NotImplemented", "sendResponse not yet implemented");
+        if (!hRequest)
+        {
+            error("NullArgument", "hRequest is null");
+            return;
+        }
+        hRequest->request.serialize();
+        const char* wire = hRequest->request.getSerialized();
+        if (wire)
+            writeRaw(wire, std::strlen(wire));
     }
 
-    void Client::sendResponseError(const spore_response_error_t* /*hError*/)
+    void Client::sendAndWait(const spore_request_t* hRequest,
+                             spore_response_t** phResponse,
+                             spore_response_error_t** phError,
+                             int timeout_ms)
     {
         errorCode.clear();
         errorWhat.clear();
@@ -299,11 +306,63 @@ namespace spore
             error("NotConnected", "client is not connected");
             return;
         }
-        // TODO: serialise error response and write to socket
-        error("NotImplemented", "sendResponseError not yet implemented");
+        if (!hRequest)
+        {
+            error("NullArgument", "hRequest is null");
+            return;
+        }
+
+        std::string handle(hRequest->request.getHandle());
+
+        {
+            std::lock_guard<std::mutex> lk(waitingMu);
+            waitingFor[handle] = { nullptr, nullptr };
+        }
+
+        hRequest->request.serialize();
+        const char* wire = hRequest->request.getSerialized();
+        if (wire)
+            writeRaw(wire, std::strlen(wire));
+
+        if (hasError())
+        {
+            std::lock_guard<std::mutex> lk(waitingMu);
+            waitingFor.erase(handle);
+            return;
+        }
+
+        std::unique_lock<std::mutex> lk(waitingMu);
+        bool signalled =
+            waitingCv.wait_for(lk,
+                               std::chrono::milliseconds(timeout_ms),
+                               [&]
+                               {
+                                   auto it = waitingFor.find(handle);
+                                   return it != waitingFor.end() && (it->second.first != nullptr ||
+                                                                     it->second.second != nullptr);
+                               });
+
+        auto it = waitingFor.find(handle);
+        if (signalled && it != waitingFor.end())
+        {
+            if (phResponse)
+                *phResponse = it->second.first;
+            if (phError)
+                *phError = it->second.second;
+        }
+        else
+        {
+            error("Timeout", "timed out waiting for synchronous response");
+            if (it != waitingFor.end())
+            {
+                delete it->second.first;
+                delete it->second.second;
+            }
+        }
+        waitingFor.erase(handle);
     }
 
-    void Client::sendWitness(const spore_witness_t* /*hWitness*/)
+    void Client::sendResponse(const spore_response_t* hResponse)
     {
         errorCode.clear();
         errorWhat.clear();
@@ -312,11 +371,18 @@ namespace spore
             error("NotConnected", "client is not connected");
             return;
         }
-        // TODO: serialise witness and write to socket
-        error("NotImplemented", "sendWitness not yet implemented");
+        if (!hResponse)
+        {
+            error("NullArgument", "hResponse is null");
+            return;
+        }
+        hResponse->response.serialize();
+        const char* wire = hResponse->response.getSerialized();
+        if (wire)
+            writeRaw(wire, std::strlen(wire));
     }
 
-    void Client::sendPublish(const spore_publish_t* /*hPublish*/)
+    void Client::sendResponseError(const spore_response_error_t* hError)
     {
         errorCode.clear();
         errorWhat.clear();
@@ -325,8 +391,55 @@ namespace spore
             error("NotConnected", "client is not connected");
             return;
         }
-        // TODO: serialise publish and write to socket
-        error("NotImplemented", "sendPublish not yet implemented");
+        if (!hError)
+        {
+            error("NullArgument", "hError is null");
+            return;
+        }
+        hError->error.serialize();
+        const char* wire = hError->error.getSerialized();
+        if (wire)
+            writeRaw(wire, std::strlen(wire));
+    }
+
+    void Client::sendWitness(const spore_witness_t* hWitness)
+    {
+        errorCode.clear();
+        errorWhat.clear();
+        if (!connected)
+        {
+            error("NotConnected", "client is not connected");
+            return;
+        }
+        if (!hWitness)
+        {
+            error("NullArgument", "hWitness is null");
+            return;
+        }
+        hWitness->witness.serialize();
+        const char* wire = hWitness->witness.getSerialized();
+        if (wire)
+            writeRaw(wire, std::strlen(wire));
+    }
+
+    void Client::sendPublish(const spore_publish_t* hPublish)
+    {
+        errorCode.clear();
+        errorWhat.clear();
+        if (!connected)
+        {
+            error("NotConnected", "client is not connected");
+            return;
+        }
+        if (!hPublish)
+        {
+            error("NullArgument", "hPublish is null");
+            return;
+        }
+        hPublish->publish.serialize();
+        const char* wire = hPublish->publish.getSerialized();
+        if (wire)
+            writeRaw(wire, std::strlen(wire));
     }
 
     void Client::listen()
@@ -338,8 +451,169 @@ namespace spore
             error("NotConnected", "client is not connected");
             return;
         }
-        // TODO: read loop — parse lines with the parser library, dispatch to handlers
-        error("NotImplemented", "listen not yet implemented");
+
+        std::string buf;
+        buf.reserve(4096);
+        char tmp[1024];
+
+        auto* parser = spore_parser_create();
+        auto* msg = spore_message_create();
+
+        while (true)
+        {
+            auto n = SPORE_READ(socketFd, tmp, sizeof(tmp));
+            if (n <= 0)
+                break;
+
+            buf.append(tmp, static_cast<size_t>(n));
+
+            std::string::size_type pos;
+            while ((pos = buf.find('\n')) != std::string::npos)
+            {
+                std::string line = buf.substr(0, pos);
+                buf.erase(0, pos + 1);
+                if (line.empty())
+                    continue;
+
+                spore_parse(parser, line.c_str(), line.size(), msg);
+                if (spore_parser_has_error(parser))
+                    continue;
+
+                switch (spore_parser_get_type(parser))
+                {
+                    case SPORE_PARSER_TYPE_REQUEST:
+                    {
+                        spore_request_t req{};
+                        req.request.setCommand(spore_message_get_capability(msg)
+                                                   ? spore_message_get_capability(msg)
+                                                   : "");
+                        req.request.setHandle(
+                            spore_message_get_handle(msg) ? spore_message_get_handle(msg) : "");
+                        size_t na = 0;
+                        const spore_arg_t* args = spore_message_get_args(msg, &na);
+                        for (size_t i = 0; i < na; ++i)
+                            req.request.addArg(args[i].pKey, args[i].pValue);
+                        size_t nf = 0;
+                        const char** flags = spore_message_get_flags(msg, &nf);
+                        for (size_t i = 0; i < nf; ++i) req.request.addFlag(flags[i]);
+                        for (auto* h : requestHandlers) h->onRequest(self, &req);
+                        break;
+                    }
+                    case SPORE_PARSER_TYPE_RESPONSE:
+                    {
+                        // Determine ok vs error by checking flags
+                        size_t nf = 0;
+                        const char** flags = spore_message_get_flags(msg, &nf);
+                        bool isError = false;
+                        for (size_t i = 0; i < nf; ++i)
+                            if (std::string_view(flags[i]) == "error" ||
+                                std::string_view(flags[i]) == "custom_error")
+                            {
+                                isError = true;
+                                break;
+                            }
+
+                        if (isError)
+                        {
+                            spore_response_error_t err{};
+                            err.error.setCommand(spore_message_get_capability(msg)
+                                                     ? spore_message_get_capability(msg)
+                                                     : "");
+                            err.error.setHandle(
+                                spore_message_get_handle(msg) ? spore_message_get_handle(msg) : "");
+                            size_t na = 0;
+                            const spore_arg_t* args = spore_message_get_args(msg, &na);
+                            for (size_t i = 0; i < na; ++i)
+                            {
+                                std::string_view k(args[i].pKey);
+                                if (k == "code")
+                                    err.error.setCode(args[i].pValue);
+                                else if (k == "what")
+                                    err.error.setWhat(args[i].pValue);
+                                else
+                                    err.error.addArg(args[i].pKey, args[i].pValue);
+                            }
+                            for (size_t i = 0; i < nf; ++i) err.error.addFlag(flags[i]);
+                            {
+                                std::lock_guard<std::mutex> lk(waitingMu);
+                                auto it = waitingFor.find(std::string(err.error.getHandle()));
+                                if (it != waitingFor.end())
+                                {
+                                    it->second.second = new spore_response_error_t(std::move(err));
+                                    waitingCv.notify_all();
+                                    break;
+                                }
+                            }
+                            for (auto* h : responseHandlers) h->onResponse(self, nullptr, &err);
+                        }
+                        else
+                        {
+                            spore_response_t resp{};
+                            resp.response.setCommand(spore_message_get_capability(msg)
+                                                         ? spore_message_get_capability(msg)
+                                                         : "");
+                            resp.response.setHandle(
+                                spore_message_get_handle(msg) ? spore_message_get_handle(msg) : "");
+                            size_t na = 0;
+                            const spore_arg_t* args = spore_message_get_args(msg, &na);
+                            for (size_t i = 0; i < na; ++i)
+                                resp.response.addArg(args[i].pKey, args[i].pValue);
+                            for (size_t i = 0; i < nf; ++i) resp.response.addFlag(flags[i]);
+                            {
+                                std::lock_guard<std::mutex> lk(waitingMu);
+                                auto it = waitingFor.find(std::string(resp.response.getHandle()));
+                                if (it != waitingFor.end())
+                                {
+                                    it->second.first = new spore_response_t(std::move(resp));
+                                    waitingCv.notify_all();
+                                    break;
+                                }
+                            }
+                            for (auto* h : responseHandlers) h->onResponse(self, &resp, nullptr);
+                        }
+                        break;
+                    }
+                    case SPORE_PARSER_TYPE_WITNESS:
+                    {
+                        spore_witness_t wit{};
+                        size_t na = 0;
+                        const spore_arg_t* args = spore_message_get_args(msg, &na);
+                        for (size_t i = 0; i < na; ++i)
+                        {
+                            if (std::string_view(args[i].pKey) == "body")
+                                wit.witness.setBody(args[i].pValue);
+                            else
+                                wit.witness.addArg(args[i].pKey, args[i].pValue);
+                        }
+                        size_t nf = 0;
+                        const char** flags = spore_message_get_flags(msg, &nf);
+                        for (size_t i = 0; i < nf; ++i) wit.witness.addFlag(flags[i]);
+                        for (auto* h : witnessHandlers) h->onWitness(self, &wit);
+                        break;
+                    }
+                    case SPORE_PARSER_TYPE_PUBLISH:
+                    {
+                        spore_publish_t pub{};
+                        if (const char* cap = spore_message_get_capability(msg))
+                            pub.publish.setTopic(cap);
+                        size_t na = 0;
+                        const spore_arg_t* args = spore_message_get_args(msg, &na);
+                        for (size_t i = 0; i < na; ++i)
+                            pub.publish.addArg(args[i].pKey, args[i].pValue);
+                        size_t nf = 0;
+                        const char** flags = spore_message_get_flags(msg, &nf);
+                        for (size_t i = 0; i < nf; ++i) pub.publish.addFlag(flags[i]);
+                        for (auto* h : publishHandlers) h->onPublish(self, &pub);
+                        break;
+                    }
+                    default:
+                        break;
+                }
+            }
+        }
+
+        spore_message_destroy(msg);
+        spore_parser_destroy(parser);
     }
 
     void Client::sendRaw(const char* data, size_t len)
@@ -351,8 +625,7 @@ namespace spore
             error("NotConnected", "client is not connected");
             return;
         }
-        if (SPORE_WRITE(socketFd, data, static_cast<int>(len)) < 0)
-            error("SendFailed", "failed to write to socket");
+        writeRaw(data, len);
     }
 
 }  // namespace spore

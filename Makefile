@@ -8,6 +8,14 @@ CLIENT_DIR := spore_c
 .PHONY: check analyze setup release debug clean test cross
 
 check:
+	@echo "==> Cleaning spore_go build and test cache..."
+	@cd $(GO_DIR) && go clean -cache -testcache
+	@echo "==> Building spore_go..."
+	@cd $(GO_DIR) && go build ./...
+	@echo "==> Vetting spore_go..."
+	@cd $(GO_DIR) && go vet ./...
+	@echo "==> Testing spore_go..."
+	@cd $(GO_DIR) && go test ./...
 	@echo "==> Cleaning go_ref build and test cache..."
 	@cd $(GO_REF_DIR) && go clean -cache -testcache
 	@echo "==> Building go_ref..."
@@ -30,6 +38,8 @@ release:
 	@echo "==> Running C tests..."
 	@$(MAKE) -C $(PARSER_DIR) test
 	@$(MAKE) -C $(CLIENT_DIR) test
+	@echo "==> Running spore_go tests..."
+	@cd $(GO_DIR) && go test ./...
 	@echo "==> Running go_ref tests..."
 	@cd $(GO_REF_DIR) && go test ./...
 	@echo "==> Done."
@@ -57,28 +67,30 @@ test:
 	@$(MAKE) -C $(PARSER_DIR) test
 	@echo "==> Running spore_c tests..."
 	@$(MAKE) -C $(CLIENT_DIR) test
+	@echo "==> Running spore_go tests..."
+	@cd $(GO_DIR) && go test ./...
 	@echo "==> Running go_ref tests..."
 	@cd $(GO_REF_DIR) && go test ./...
 
 analyze:
-	@echo "==> Running go_ref tests with race detector..."
-	@cd $(GO_REF_DIR) && go test -race ./...
+	@echo "==> Running spore_go tests with race detector..."
+	@cd $(GO_DIR) && go test -race ./...
 
-	@echo "==> Generating go_ref coverage report..."
-	@cd $(GO_REF_DIR) && go test -coverprofile=coverage.out ./...
-	@cd $(GO_REF_DIR) && go tool cover -func=coverage.out
+	@echo "==> Generating spore_go coverage report..."
+	@cd $(GO_DIR) && go test -coverprofile=coverage.out ./...
+	@cd $(GO_DIR) && go tool cover -func=coverage.out
 
-	@echo "==> Running staticcheck..."
-	@cd $(GO_REF_DIR) && staticcheck ./...
+	@echo "==> Running staticcheck on spore_go..."
+	@cd $(GO_DIR) && staticcheck ./...
 
-	@echo "==> Running golangci-lint..."
-	@cd $(GO_REF_DIR) && golangci-lint run
+	@echo "==> Running golangci-lint on spore_go..."
+	@cd $(GO_DIR) && golangci-lint run
 
-	@echo "==> Checking go_ref go.mod is tidy..."
-	@cd $(GO_REF_DIR) && go mod tidy && git diff --exit-code go.mod go.sum
+	@echo "==> Checking spore_go go.mod is tidy..."
+	@cd $(GO_DIR) && go mod tidy && git diff --exit-code go.mod go.sum
 
-	@echo "==> Running govulncheck..."
-	@cd $(GO_REF_DIR) && govulncheck ./...
+	@echo "==> Running govulncheck on spore_go..."
+	@cd $(GO_DIR) && govulncheck ./...
 
 	@echo "==> Analysis complete."
 

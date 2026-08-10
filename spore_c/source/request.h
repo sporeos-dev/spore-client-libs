@@ -6,6 +6,8 @@ namespace spore
 {
     class Request : public Message
     {
+    public:
+        void serialize() const;
         // command = capability name, handle = ~handle assigned by caller
     };
 

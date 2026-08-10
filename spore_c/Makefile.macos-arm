@@ -14,7 +14,7 @@ SRCS := $(wildcard source/*.cpp)
 CXX  := clang++
 AR   := ar
 
-CXXFLAGS_COMMON  := -std=c++17 -arch arm64 -fPIC -Iinclude -Isource
+CXXFLAGS_COMMON  := -std=c++17 -arch arm64 -fPIC -Iinclude -Isource -I../parser/include
 CXXFLAGS_RELEASE := $(CXXFLAGS_COMMON) -O2 -DNDEBUG
 CXXFLAGS_DEBUG   := $(CXXFLAGS_COMMON) -g -O0 -DDEBUG
 
@@ -30,13 +30,13 @@ $(DIST)/$(LIB_STATIC): $(RELEASE_OBJS) | $(DIST)
 	$(AR) rcs $@ $^
 
 $(DIST)/$(LIB_SHARED): $(RELEASE_OBJS) | $(DIST)
-	$(CXX) -arch arm64 -dynamiclib -o $@ $^
+	$(CXX) -arch arm64 -dynamiclib -o $@ $^ $(DIST)/libspore_parser.a
 
 $(DIST)/$(LIB_STATIC_D): $(DEBUG_OBJS) | $(DIST)
 	$(AR) rcs $@ $^
 
 $(DIST)/$(LIB_SHARED_D): $(DEBUG_OBJS) | $(DIST)
-	$(CXX) -arch arm64 -dynamiclib -o $@ $^
+	$(CXX) -arch arm64 -dynamiclib -o $@ $^ $(DIST)/libspore_parser_d.a
 
 source/%.o: source/%.cpp
 	$(CXX) $(CXXFLAGS_RELEASE) -c $< -o $@

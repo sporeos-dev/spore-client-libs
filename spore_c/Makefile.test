@@ -11,6 +11,7 @@ TEST_BIN := $(ROOT)/dist/spore_c_test
 CXX      := clang++
 CXXFLAGS := -std=c++17 -arch arm64 \
             -Iinclude -Isource \
+            -I../parser/include \
             -I$(GTEST)/include
 
 SRCS     := $(wildcard source/*.cpp) \
@@ -25,7 +26,7 @@ test: $(TEST_BIN)
 	@$(TEST_BIN) $(if $(FILTER),--gtest_filter=$(FILTER),)
 
 $(TEST_BIN): $(SRCS) | $(ROOT)/dist
-	$(CXX) $(CXXFLAGS) -I$(GTEST) $^ -o $@ -lpthread
+	$(CXX) $(CXXFLAGS) -I$(GTEST) $^ $(ROOT)/dist/libspore_parser.a -o $@ -lpthread
 
 $(ROOT)/dist:
 	@mkdir -p $@

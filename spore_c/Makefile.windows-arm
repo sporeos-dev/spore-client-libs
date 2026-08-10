@@ -16,7 +16,7 @@ SRCS := $(wildcard source/*.cpp)
 CXX  := aarch64-w64-mingw32-clang++
 AR   := aarch64-w64-mingw32-ar
 
-CXXFLAGS_COMMON  := -std=c++17 -fPIC -Iinclude -Isource \
+CXXFLAGS_COMMON  := -std=c++17 -fPIC -Iinclude -Isource -I../parser/include \
                     -static-libstdc++ -static-libgcc
 CXXFLAGS_RELEASE := $(CXXFLAGS_COMMON) -O2 -DNDEBUG
 CXXFLAGS_DEBUG   := $(CXXFLAGS_COMMON) -g -O0 -DDEBUG

@@ -7,6 +7,8 @@ namespace spore
     // An ok response from the hub.
     class Response : public Message
     {
+    public:
+        void serialize() const;
         // command = capability name, handle = ~handle from the original request
     };
 
@@ -14,6 +16,7 @@ namespace spore
     class ResponseError : public Message
     {
     public:
+        void serialize() const;
         std::string_view getCode() const;
         std::string_view getWhat() const;
         void setCode(std::string_view code);
