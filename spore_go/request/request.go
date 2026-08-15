@@ -63,3 +63,5 @@ func (r *Request) ArgIf(key string, def string) string {
 func (r *Request) Flag(flag string) bool {
 	return sporec.RequestHasFlag(r.h, flag)
 }
+
+func (r *Request) H() *sporec.Request { return r.h }

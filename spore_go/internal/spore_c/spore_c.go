@@ -96,9 +96,6 @@ func RequestHasFlag(r *Request, flag string) bool {
 
 // send/serialize
 func RequestSend(c *Client, r *Request)        { C.spore_request_send(c, r) }
-func RequestSendAndWait(c *Client, r *Request, res **Response, err **ResponseError, timeout int) bool { 
-	return bool(C.spore_request_send_and_wait(c, r, res, err, C.int(timeout)))
-}
 func RequestSerialize(r *Request)              { C.spore_request_serialize(r) }
 func RequestGetSerialized(r *Request) string   { return C.GoString(C.spore_request_get_serialized(r)) }
 

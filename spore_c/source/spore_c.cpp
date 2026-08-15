@@ -222,18 +222,6 @@ void spore_request_send(spore_client_t* hClient, const spore_request_t* hRequest
     hClient->client.send(hRequest);
 }
 
-bool spore_request_send_and_wait(spore_client_t* hClient,
-                                 const spore_request_t* hRequest,
-                                 spore_response_t** phResponse,
-                                 spore_response_error_t** phError,
-                                 int timeout_ms)
-{
-    if (!hClient)
-        return false;
-    hClient->client.sendAndWait(hRequest, phResponse, phError, timeout_ms);
-    return !hClient->client.hasError();
-}
-
 void spore_request_serialize(spore_request_t* hRequest)
 {
     if (!hRequest)

@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstring>
 #include <string>
+#include <iostream>
 
 #if defined(_WIN32)
     #include <winsock2.h>
@@ -11,7 +12,7 @@
     #pragma comment(lib, "ws2_32.lib")
     #define SPORE_CLOSE(fd) closesocket(fd)
     #define SPORE_WRITE(fd, buf, len) send(fd, buf, (int)(len), 0)
-    #define SPORE_READ(fd, buf, len) recv(fd, buf, (int)(len), 0)
+    #define SPORE_READ(fd, buf, le``n) recv(fd, buf, (int)(len), 0)
 #else
     #include <sys/socket.h>
     #include <sys/un.h>
@@ -271,7 +272,13 @@ namespace spore
     {
         std::lock_guard<std::mutex> lk(writeMu);
         if (SPORE_WRITE(socketFd, data, static_cast<int>(len)) < 0)
+        {
             error("SendFailed", "failed to write to socket");
+            return;
+        }
+        // hub uses ReadString('\n') so every message must end with a newline
+        if (SPORE_WRITE(socketFd, "\n", 1) < 0)
+            error("SendFailed", "failed to write newline terminator");
     }
 
     void Client::send(const spore_request_t* hRequest)
@@ -292,74 +299,6 @@ namespace spore
         const char* wire = hRequest->request.getSerialized();
         if (wire)
             writeRaw(wire, std::strlen(wire));
-    }
-
-    void Client::sendAndWait(const spore_request_t* hRequest,
-                             spore_response_t** phResponse,
-                             spore_response_error_t** phError,
-                             int timeout_ms)
-    {
-        errorCode.clear();
-        errorWhat.clear();
-        if (!connected)
-        {
-            error("NotConnected", "client is not connected");
-            return;
-        }
-        if (!hRequest)
-        {
-            error("NullArgument", "hRequest is null");
-            return;
-        }
-
-        std::string handle(hRequest->request.getHandle());
-
-        {
-            std::lock_guard<std::mutex> lk(waitingMu);
-            waitingFor[handle] = { nullptr, nullptr };
-        }
-
-        hRequest->request.serialize();
-        const char* wire = hRequest->request.getSerialized();
-        if (wire)
-            writeRaw(wire, std::strlen(wire));
-
-        if (hasError())
-        {
-            std::lock_guard<std::mutex> lk(waitingMu);
-            waitingFor.erase(handle);
-            return;
-        }
-
-        std::unique_lock<std::mutex> lk(waitingMu);
-        bool signalled =
-            waitingCv.wait_for(lk,
-                               std::chrono::milliseconds(timeout_ms),
-                               [&]
-                               {
-                                   auto it = waitingFor.find(handle);
-                                   return it != waitingFor.end() && (it->second.first != nullptr ||
-                                                                     it->second.second != nullptr);
-                               });
-
-        auto it = waitingFor.find(handle);
-        if (signalled && it != waitingFor.end())
-        {
-            if (phResponse)
-                *phResponse = it->second.first;
-            if (phError)
-                *phError = it->second.second;
-        }
-        else
-        {
-            error("Timeout", "timed out waiting for synchronous response");
-            if (it != waitingFor.end())
-            {
-                delete it->second.first;
-                delete it->second.second;
-            }
-        }
-        waitingFor.erase(handle);
     }
 
     void Client::sendResponse(const spore_response_t* hResponse)
@@ -456,8 +395,8 @@ namespace spore
         buf.reserve(4096);
         char tmp[1024];
 
-        auto* parser = spore_parser_create();
-        auto* msg = spore_message_create();
+        spore_parser_t* parser = nullptr;
+        spore_message_t* msg = nullptr;
 
         while (true)
         {
@@ -471,9 +410,23 @@ namespace spore
             while ((pos = buf.find('\n')) != std::string::npos)
             {
                 std::string line = buf.substr(0, pos);
+                std::cout << "Received: " << line << std::endl;
                 buf.erase(0, pos + 1);
                 if (line.empty())
                     continue;
+
+                if (parser)
+                {
+                    spore_parser_destroy(parser);
+                    parser = nullptr;
+                }
+                if (msg)
+                {
+                    spore_message_destroy(msg);
+                    msg = nullptr;
+                }
+                parser = spore_parser_create();
+                msg = spore_message_create();
 
                 spore_parse(parser, line.c_str(), line.size(), msg);
                 if (spore_parser_has_error(parser))
@@ -516,11 +469,8 @@ namespace spore
                         if (isError)
                         {
                             spore_response_error_t err{};
-                            err.error.setCommand(spore_message_get_capability(msg)
-                                                     ? spore_message_get_capability(msg)
-                                                     : "");
-                            err.error.setHandle(
-                                spore_message_get_handle(msg) ? spore_message_get_handle(msg) : "");
+                            err.error.setCommand(spore_message_get_capability(msg));
+                            err.error.setHandle(spore_message_get_handle(msg));
                             size_t na = 0;
                             const spore_arg_t* args = spore_message_get_args(msg, &na);
                             for (size_t i = 0; i < na; ++i)
@@ -534,16 +484,6 @@ namespace spore
                                     err.error.addArg(args[i].pKey, args[i].pValue);
                             }
                             for (size_t i = 0; i < nf; ++i) err.error.addFlag(flags[i]);
-                            {
-                                std::lock_guard<std::mutex> lk(waitingMu);
-                                auto it = waitingFor.find(std::string(err.error.getHandle()));
-                                if (it != waitingFor.end())
-                                {
-                                    it->second.second = new spore_response_error_t(std::move(err));
-                                    waitingCv.notify_all();
-                                    break;
-                                }
-                            }
                             for (auto* h : responseHandlers) h->onResponse(self, nullptr, &err);
                         }
                         else
@@ -559,16 +499,6 @@ namespace spore
                             for (size_t i = 0; i < na; ++i)
                                 resp.response.addArg(args[i].pKey, args[i].pValue);
                             for (size_t i = 0; i < nf; ++i) resp.response.addFlag(flags[i]);
-                            {
-                                std::lock_guard<std::mutex> lk(waitingMu);
-                                auto it = waitingFor.find(std::string(resp.response.getHandle()));
-                                if (it != waitingFor.end())
-                                {
-                                    it->second.first = new spore_response_t(std::move(resp));
-                                    waitingCv.notify_all();
-                                    break;
-                                }
-                            }
                             for (auto* h : responseHandlers) h->onResponse(self, &resp, nullptr);
                         }
                         break;

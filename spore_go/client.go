@@ -65,21 +65,9 @@ func (c *Client) SendRaw(raw string) error {
 	return c.error()
 }
 
-func (c *Client) SendRequest(r *sporec.Request) error {
-	sporec.RequestSend(c.h, r)
+func (c *Client) SendRequest(r *request.Request) error {
+	sporec.RequestSend(c.h, r.H())
 	return c.error()
-}
-
-func (c *Client) SendRequestAndWait(r *sporec.Request, timeout int) (*response.Response, *response.ResponseError, bool) {
-	var Response *sporec.Response
-	var ResponseError *sporec.ResponseError
-	_ = sporec.RequestSendAndWait(c.h, r, &Response, &ResponseError, timeout)
-	if Response != nil {
-		return response.FromC(Response), nil, true
-	} else if ResponseError != nil {
-		return nil, response.ErrorFromC(ResponseError), true
-	}
-	return nil, nil, false
 }
 
 func (c *Client) SendResponse(r *response.Response) error {
@@ -92,13 +80,13 @@ func (c *Client) SendResponseError(e *response.ResponseError) error {
 	return c.error()
 }
 
-func (c *Client) SendWitness(w *sporec.Witness) error {
-	sporec.WitnessSend(c.h, w)
+func (c *Client) SendWitness(w *witness.Witness) error {
+	sporec.WitnessSend(c.h, w.H())
 	return c.error()
 }
 
-func (c *Client) SendPublish(p *sporec.Publish) error {
-	sporec.PublishSend(c.h, p)
+func (c *Client) SendPublish(p *publish.Publish) error {
+	sporec.PublishSend(c.h, p.H())
 	return c.error()
 }
 
@@ -156,21 +144,4 @@ func (c *Client) OnPublish(fn func(*publish.Publish)) *Handler {
 
 func (c *Client) Off(handler *Handler) {
 	sporec.ClientOffHandler(c.h, handler.h)
-}
-
-func (c *Client) SendRawAndWait(raw string, timeoutMs int) (*response.Response, *response.ResponseError, error) {
-	r := sporec.RequestCreateFromRaw(raw)
-	if r == nil {
-		return nil, nil, fmt.Errorf("failed to parse request")
-	}
-	defer sporec.RequestDestroy(r)
-	var res *sporec.Response
-	var rerr *sporec.ResponseError
-	if !sporec.RequestSendAndWait(c.h, r, &res, &rerr, timeoutMs) {
-		return nil, nil, c.error()
-	}
-	if rerr != nil {
-		return nil, response.ErrorFromC(rerr), nil
-	}
-	return response.FromC(res), nil, nil
 }

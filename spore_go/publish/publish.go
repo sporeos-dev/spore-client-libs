@@ -59,6 +59,8 @@ func (p *Publish) Flag(flag string) bool {
 	return sporec.PublishHasFlag(p.h, flag)
 }
 
+func (p *Publish) H() *sporec.Publish { return p.h }
+
 func (p *Publish) Serialize() string {
 	sporec.PublishSerialize(p.h)
 	return sporec.PublishGetSerialized(p.h)
