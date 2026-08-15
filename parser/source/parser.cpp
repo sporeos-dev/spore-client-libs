@@ -361,6 +361,8 @@ namespace spore
                                 props.hasArgCode = true;
                             else if (key == "what")
                                 props.hasArgWhat = true;
+                            else if (key == "body")
+                                props.hasArgBody = true;
                             hMessage->message.addArg(key.c_str(), value.c_str());
                         }
                         break;
@@ -418,7 +420,8 @@ namespace spore
 
             case SPORE_PARSER_TYPE_WITNESS:
             {
-                // intentionally left blank
+                if (!props.hasArgBody)
+                    error("Malformed", "witness missing body");
             }
             break;
 

@@ -410,7 +410,6 @@ namespace spore
             while ((pos = buf.find('\n')) != std::string::npos)
             {
                 std::string line = buf.substr(0, pos);
-                std::cout << "Received: " << line << std::endl;
                 buf.erase(0, pos + 1);
                 if (line.empty())
                     continue;

@@ -57,6 +57,7 @@ namespace spore
             bool hasFlagError = false;
             bool hasArgCode = false;
             bool hasArgWhat = false;
+            bool hasArgBody = false;
         };
 
         void tokenize(std::string_view message, std::vector<token_t>& tokens);

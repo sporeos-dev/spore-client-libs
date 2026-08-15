@@ -27,3 +27,11 @@ TEST_F(Witness, args_and_flags)
     EXPECT_FALSE(flag("flag"));
     EXPECT_FALSE(flag("arg1=value1"));
 }
+
+TEST_F(Witness, missing_body)
+{
+    parse("witness flag1");
+    EXPECT_EQ(spore_parser_get_type(parser), SPORE_PARSER_TYPE_WITNESS);
+    EXPECT_TRUE(spore_parser_has_error(parser));
+    EXPECT_STREQ(spore_parser_get_error_code(parser), "Malformed");
+}
