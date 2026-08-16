@@ -108,6 +108,14 @@ spore_handler_t* spore_client_register_publish_handler(spore_client_t* hClient, 
     return hClient->client.registerPublishHandler(fn);
 }
 
+spore_handler_t* spore_client_register_parse_error_handler(spore_client_t* hClient,
+                                                           spore_parse_error_fn fn)
+{
+    if (!hClient || !fn)
+        return nullptr;
+    return hClient->client.registerParseErrorHandler(fn);
+}
+
 void spore_client_unregister_handler(spore_client_t* hClient, spore_handler_t* hHandler)
 {
     if (!hClient)

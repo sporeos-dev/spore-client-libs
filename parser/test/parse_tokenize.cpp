@@ -51,7 +51,7 @@ TEST_F(Tokenize, quotes)
     EXPECT_EQ(tokens[1].type, token_t::type_t::HANDLE);
     EXPECT_EQ(tokens[2].type, token_t::type_t::ARG);
     EXPECT_EQ(tokens[3].type, token_t::type_t::NONE);
-    EXPECT_STREQ(tokens[2].value.c_str(), "body=\"some message\"");
+    EXPECT_STREQ(tokens[2].value.c_str(), "body=some message");
 }
 
 TEST_F(Tokenize, single_quotes)
@@ -62,7 +62,7 @@ TEST_F(Tokenize, single_quotes)
     EXPECT_EQ(tokens[1].type, token_t::type_t::HANDLE);
     EXPECT_EQ(tokens[2].type, token_t::type_t::ARG);
     EXPECT_EQ(tokens[3].type, token_t::type_t::NONE);
-    EXPECT_STREQ(tokens[2].value.c_str(), "body='some message'");
+    EXPECT_STREQ(tokens[2].value.c_str(), "body=some message");
 }
 
 TEST_F(Tokenize, squares)
@@ -103,14 +103,14 @@ TEST_F(Tokenize, left_open)
     {
         tokenize("Some ~h body=\"some message", tokens);
         EXPECT_EQ(tokens.size(), 3);
-        EXPECT_STREQ(tokens[2].value.c_str(), "body=\"some message\"");
+        EXPECT_STREQ(tokens[2].value.c_str(), "body=some message");
         tokens.clear();
     }
 
     {
         tokenize("Some ~h body='some message", tokens);
         EXPECT_EQ(tokens.size(), 3);
-        EXPECT_STREQ(tokens[2].value.c_str(), "body='some message'");
+        EXPECT_STREQ(tokens[2].value.c_str(), "body=some message");
         tokens.clear();
     }
 

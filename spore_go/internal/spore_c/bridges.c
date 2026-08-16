@@ -13,3 +13,6 @@ spore_handler_t* registerWitnessHandler(spore_client_t* c) {
 spore_handler_t* registerPublishHandler(spore_client_t* c) {
     return spore_client_register_publish_handler(c, (spore_publish_fn)goPublishBridge);
 }
+spore_handler_t* registerParseErrorHandler(spore_client_t* c) {
+    return spore_client_register_parse_error_handler(c, (spore_parse_error_fn)goParseErrorBridge);
+}

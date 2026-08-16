@@ -21,7 +21,8 @@ struct spore_handler_t
         request,
         response,
         witness,
-        publish
+        publish,
+        parse_error
     } type;
     int id;
     union
@@ -30,6 +31,7 @@ struct spore_handler_t
         spore_response_fn onResponse;
         spore_witness_fn onWitness;
         spore_publish_fn onPublish;
+        spore_parse_error_fn onParseError;
     };
 };
 

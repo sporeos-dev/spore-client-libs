@@ -3,6 +3,7 @@ package spore
 import (
 	"fmt"
 	"runtime"
+	"strings"
 
 	sporec "github.com/sporeos-dev/spore-client-libs/spore_go/internal/spore_c"
 	"github.com/sporeos-dev/spore-client-libs/spore_go/publish"
@@ -16,14 +17,32 @@ type Client struct {
 	h *sporec.Client
 }
 
-func New(nodeid string) (*Client, error) {
+func New(nodeid string) *Client {
 	c := &Client{nodeid: nodeid, h: sporec.ClientCreate(nodeid)}
 	if sporec.ClientHasError(c.h) {
+		// the thought is that this really shouldn't fail
+		// but if it does, something should catch it
+		println("Error creating client:", sporec.ClientGetErrorCode(c.h), sporec.ClientGetErrorWhat(c.h))
 		c.destroy()
-		return nil, fmt.Errorf(`[%s] %s`, sporec.ClientGetErrorCode(c.h), sporec.ClientGetErrorWhat(c.h))
+		return nil
 	}
 	runtime.SetFinalizer(c, (*Client).destroy)
-	return c, nil
+	return c
+}
+
+// log to stdout &&
+// send witness information
+func (c *Client) WithDefaultErrorHandler() *Client {
+	c.OnParseError(func(code, what, raw string) {
+		fmt.Printf("Parse error: [%s] %s\n", code, what)
+		fmt.Printf("Raw: %s\n", raw)
+		c.SendWitness(witness.New(fmt.Sprintf(`Parse error: [%s] %s`, code, what)))
+		raw = strings.ReplaceAll(raw, "\n", "\\n")
+		raw = strings.ReplaceAll(raw, "\"", "\\\"")
+		c.SendWitness(witness.New(fmt.Sprintf(`Raw: %s`, raw)))
+	})
+	
+	return c
 }
 
 func (c *Client) destroy() {
@@ -138,6 +157,13 @@ func (c *Client) OnWitness(fn func(*witness.Witness)) *Handler {
 func (c *Client) OnPublish(fn func(*publish.Publish)) *Handler {
 	h := sporec.ClientOnPublish(c.h, func(_ *sporec.Client, p *sporec.Publish) {
 		fn(publish.FromC(p))
+	})
+	return &Handler{h: h}
+}
+
+func (c *Client) OnParseError(fn func(code, what, raw string)) *Handler {
+	h := sporec.ClientOnParseError(c.h, func(_ *sporec.Client, code, what, raw string) {
+		fn(code, what, raw)
 	})
 	return &Handler{h: h}
 }

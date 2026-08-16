@@ -92,13 +92,11 @@ namespace spore
                         break;
                         case '"':
                         {
-                            curr.value.push_back(c);
                             where = inside::QUOTES;
                         }
                         break;
                         case '\'':
                         {
-                            curr.value.push_back(c);
                             where = inside::S_QUOTES;
                         }
                         break;
@@ -155,7 +153,6 @@ namespace spore
                 {
                     if (c == '\'')
                     {
-                        curr.value.push_back(c);
                         where = inside::NONE;
                     }
                     else
@@ -172,7 +169,6 @@ namespace spore
                 {
                     if (c == '"')
                     {
-                        curr.value.push_back(c);
                         where = inside::NONE;
                     }
                     else
@@ -239,11 +235,9 @@ namespace spore
         {
             case inside::S_QUOTES:
                 error("Malformed", "single quotes not closed");
-                curr.value.push_back('\'');
                 break;
             case inside::QUOTES:
                 error("Malformed", "quotes not closed");
-                curr.value.push_back('"');
                 break;
             case inside::SQUARES:
                 error("Malformed", "square brackets not closed");

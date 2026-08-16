@@ -35,6 +35,7 @@ namespace spore
         for (auto* h : responseHandlers) delete h;
         for (auto* h : witnessHandlers) delete h;
         for (auto* h : publishHandlers) delete h;
+        for (auto* h : parseErrorHandlers) delete h;
     }
 
     void Client::error(std::string_view code, std::string_view what)
@@ -234,6 +235,16 @@ namespace spore
         return h;
     }
 
+    spore_handler_t* Client::registerParseErrorHandler(spore_parse_error_fn fn)
+    {
+        auto* h = new spore_handler_t{};
+        h->type = spore_handler_t::type_t::parse_error;
+        h->id = nextId++;
+        h->onParseError = fn;
+        parseErrorHandlers.push_back(h);
+        return h;
+    }
+
     void Client::unregisterHandler(spore_handler_t* hHandler)
     {
         if (!hHandler)
@@ -262,6 +273,9 @@ namespace spore
                 break;
             case spore_handler_t::type_t::publish:
                 erase(publishHandlers);
+                break;
+            case spore_handler_t::type_t::parse_error:
+                erase(parseErrorHandlers);
                 break;
         }
     }
@@ -429,7 +443,14 @@ namespace spore
 
                 spore_parse(parser, line.c_str(), line.size(), msg);
                 if (spore_parser_has_error(parser))
+                {
+                    for (auto* h : parseErrorHandlers)
+                        h->onParseError(self,
+                                        spore_parser_get_error_code(parser),
+                                        spore_parser_get_error_what(parser),
+                                        line.c_str());
                     continue;
+                }
 
                 switch (spore_parser_get_type(parser))
                 {

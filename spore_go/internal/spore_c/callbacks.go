@@ -9,6 +9,7 @@ extern spore_handler_t* registerRequestHandler(spore_client_t* c);
 extern spore_handler_t* registerResponseHandler(spore_client_t* c);
 extern spore_handler_t* registerWitnessHandler(spore_client_t* c);
 extern spore_handler_t* registerPublishHandler(spore_client_t* c);
+extern spore_handler_t* registerParseErrorHandler(spore_client_t* c);
 */
 import "C"
 import (
@@ -20,12 +21,14 @@ type RequestHandler  func(c *Client, r *Request)
 type ResponseHandler func(c *Client, r *Response, e *ResponseError)
 type WitnessHandler  func(c *Client, w *Witness)
 type PublishHandler  func(c *Client, p *Publish)
+type ParseErrorHandler func(c *Client, code, what, raw string)
 
 var (
-	requestHandlers  sync.Map // uintptr -> RequestHandler
-	responseHandlers sync.Map // uintptr -> ResponseHandler
-	witnessHandlers  sync.Map // uintptr -> WitnessHandler
-	publishHandlers  sync.Map // uintptr -> PublishHandler
+	requestHandlers    sync.Map // uintptr -> RequestHandler
+	responseHandlers   sync.Map // uintptr -> ResponseHandler
+	witnessHandlers    sync.Map // uintptr -> WitnessHandler
+	publishHandlers    sync.Map // uintptr -> PublishHandler
+	parseErrorHandlers sync.Map // uintptr -> ParseErrorHandler
 )
 
 func key(c *Client) uintptr { return uintptr(unsafe.Pointer(c)) }
@@ -58,6 +61,13 @@ func goPublishBridge(c *C.spore_client_t, p *C.spore_publish_t) {
 	}
 }
 
+//export goParseErrorBridge
+func goParseErrorBridge(c *C.spore_client_t, code *C.char, what *C.char, raw *C.char) {
+	if fn, ok := parseErrorHandlers.Load(key(c)); ok {
+		fn.(ParseErrorHandler)(c, C.GoString(code), C.GoString(what), C.GoString(raw))
+	}
+}
+
 func ClientOnRequest(c *Client, fn RequestHandler) *Handler {
 	requestHandlers.Store(key(c), fn)
 	return C.registerRequestHandler(c)
@@ -76,6 +86,11 @@ func ClientOnWitness(c *Client, fn WitnessHandler) *Handler {
 func ClientOnPublish(c *Client, fn PublishHandler) *Handler {
 	publishHandlers.Store(key(c), fn)
 	return C.registerPublishHandler(c)
+}
+
+func ClientOnParseError(c *Client, fn ParseErrorHandler) *Handler {
+	parseErrorHandlers.Store(key(c), fn)
+	return C.registerParseErrorHandler(c)
 }
 
 func ClientOffHandler(c *Client, h *Handler) {

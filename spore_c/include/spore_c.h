@@ -29,6 +29,10 @@ extern "C"
                                       const spore_response_error_t* hError);
     typedef void (*spore_witness_fn)(spore_client_t* hClient, const spore_witness_t* hWitness);
     typedef void (*spore_publish_fn)(spore_client_t* hClient, const spore_publish_t* hPublish);
+    typedef void (*spore_parse_error_fn)(spore_client_t* hClient,
+                                         const char* pCode,
+                                         const char* pWhat,
+                                         const char* pRaw);
 
     //
     //
@@ -55,6 +59,8 @@ extern "C"
                                                             spore_response_fn fn);
     spore_handler_t* spore_client_register_publish_handler(spore_client_t* hClient,
                                                            spore_publish_fn fn);
+    spore_handler_t* spore_client_register_parse_error_handler(spore_client_t* hClient,
+                                                               spore_parse_error_fn fn);
     void spore_client_unregister_handler(spore_client_t* hClient, spore_handler_t* hHandler);
 
     // main event loop
