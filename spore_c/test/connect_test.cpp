@@ -21,7 +21,7 @@ TEST_F(Fixture, InitiallyNoError)
 
 TEST_F(Fixture, CreateNullNodeIdReturnsNull)
 {
-    EXPECT_EQ(spore_client_create(nullptr), nullptr);
+    EXPECT_EQ(spore_client_create(nullptr, false), nullptr);
 }
 
 // --- Connection (no daemon running) ---
@@ -154,6 +154,32 @@ TEST_F(Fixture, ResponseSettersAndGetters)
     EXPECT_STREQ(spore_response_get_command(r), "some.capability");
     EXPECT_STREQ(spore_response_get_arg(r, "result"), "42");
     EXPECT_TRUE(spore_response_has_flag(r, "done"));
+
+    spore_response_destroy(r);
+}
+
+TEST_F(Fixture, ResponseSerializesOkFlag)
+{
+    auto* r = spore_response_create();
+    spore_response_set_handle(r, "hyphae-2");
+    spore_response_set_command(r, "HYPHAE.node.spawn");
+    spore_response_serialize(r);
+
+    EXPECT_STREQ(spore_response_get_serialized(r), "~hyphae-2:HYPHAE.node.spawn ok\n");
+
+    spore_response_destroy(r);
+}
+
+TEST_F(Fixture, ResponseDoesNotDuplicateOkFlag)
+{
+    auto* r = spore_response_create();
+    spore_response_set_handle(r, "hyphae-2");
+    spore_response_set_command(r, "HYPHAE.node.spawn");
+    spore_response_add_flag(r, "ok");
+    spore_response_serialize(r);
+
+    const char* serialized = spore_response_get_serialized(r);
+    EXPECT_STREQ(serialized, "~hyphae-2:HYPHAE.node.spawn ok\n");
 
     spore_response_destroy(r);
 }

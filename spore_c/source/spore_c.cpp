@@ -1,6 +1,9 @@
 #include "spore_c.h"
 #include "defs.h"
 #include "spore_parser.h"
+#include <iostream>
+
+static bool g_trace = false;
 
 // Helper: return c_str() or nullptr when the string_view is empty.
 static const char* sv(std::string_view s)
@@ -25,11 +28,12 @@ static void populateMessage(spore::Message& msg, spore_message_t* m)
 // client
 // ============================================================
 
-spore_client_t* spore_client_create(const char* pNodeId)
+spore_client_t* spore_client_create(const char* pNodeId, bool trace)
 {
+    g_trace = trace;
     if (!pNodeId)
         return nullptr;
-    auto* h = new spore_client_t{ spore::Client(pNodeId) };
+    auto* h = new spore_client_t{ spore::Client(pNodeId, trace) };
     h->client.self = h;
     return h;
 }
@@ -37,6 +41,13 @@ spore_client_t* spore_client_create(const char* pNodeId)
 void spore_client_destroy(spore_client_t* hClient)
 {
     delete hClient;
+}
+
+void spore_client_force_trace(spore_client_t* hClient)
+{
+    g_trace = true;
+    if (hClient)
+        hClient->client.forceTrace();
 }
 
 void spore_client_connect(spore_client_t* hClient)
@@ -150,7 +161,7 @@ spore_request_t* spore_request_create_from_raw(const char* pRaw, size_t sz)
 {
     if (!pRaw)
         return nullptr;
-    auto* p = spore_parser_create();
+    auto* p = spore_parser_create(g_trace);
     auto* m = spore_message_create();
     spore_parse(p, pRaw, sz, m);
     spore_request_t* result = nullptr;
@@ -257,7 +268,7 @@ spore_response_t* spore_response_create_from_raw(const char* pRaw, size_t sz)
 {
     if (!pRaw)
         return nullptr;
-    auto* p = spore_parser_create();
+    auto* p = spore_parser_create(g_trace);
     auto* m = spore_message_create();
     spore_parse(p, pRaw, sz, m);
     spore_response_t* result = nullptr;
@@ -364,7 +375,7 @@ spore_response_error_t* spore_response_error_create_from_raw(const char* pRaw, s
 {
     if (!pRaw)
         return nullptr;
-    auto* p = spore_parser_create();
+    auto* p = spore_parser_create(g_trace);
     auto* m = spore_message_create();
     spore_parse(p, pRaw, sz, m);
     spore_response_error_t* result = nullptr;
@@ -511,7 +522,7 @@ spore_witness_t* spore_witness_create_from_raw(const char* pRaw, size_t sz)
 {
     if (!pRaw)
         return nullptr;
-    auto* p = spore_parser_create();
+    auto* p = spore_parser_create(g_trace);
     auto* m = spore_message_create();
     spore_parse(p, pRaw, sz, m);
     spore_witness_t* result = nullptr;
@@ -616,7 +627,7 @@ spore_publish_t* spore_publish_create_from_raw(const char* pRaw, size_t sz)
 {
     if (!pRaw)
         return nullptr;
-    auto* p = spore_parser_create();
+    auto* p = spore_parser_create(g_trace);
     auto* m = spore_message_create();
     spore_parse(p, pRaw, sz, m);
     spore_publish_t* result = nullptr;

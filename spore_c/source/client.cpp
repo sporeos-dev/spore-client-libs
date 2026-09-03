@@ -24,7 +24,7 @@
 
 namespace spore
 {
-    Client::Client(std::string_view id) : nodeId(id)
+    Client::Client(std::string_view id, bool trace) : nodeId(id), trace(trace)
     {
     }
 
@@ -191,6 +191,11 @@ namespace spore
             socketFd = kInvalidSocket;
         }
         connected = false;
+    }
+
+    void Client::forceTrace()
+    {
+        trace = true;
     }
 
     // --- Handler registration ---
@@ -408,6 +413,8 @@ namespace spore
         std::string buf;
         buf.reserve(4096);
         char tmp[1024];
+        std::string line;
+        bool multiline = false;
 
         spore_parser_t* parser = nullptr;
         spore_message_t* msg = nullptr;
@@ -423,8 +430,43 @@ namespace spore
             std::string::size_type pos;
             while ((pos = buf.find('\n')) != std::string::npos)
             {
-                std::string line = buf.substr(0, pos);
+                std::string currentLine = buf.substr(0, pos);
                 buf.erase(0, pos + 1);
+
+                // strip \r for Windows line endings
+                if (!currentLine.empty() && currentLine.back() == '\r')
+                    currentLine.pop_back();
+
+                if (!multiline)
+                {
+                    if (currentLine.find("<<") != std::string::npos)
+                    {
+                        multiline = true;
+                        line = currentLine + "\n";
+                        continue;
+                    }
+                    else
+                    {
+                        line = currentLine;
+                    }
+                }
+                else
+                {
+                    // >> must be the first token on its line
+                    bool isClose = (currentLine == ">>" || currentLine.substr(0, 3) == ">> ");
+                    if (!isClose)
+                    {
+                        line += currentLine + "\n";
+                        continue;
+                    }
+                    line += currentLine;
+
+                    // a new block on the same >> line keeps us in multiline
+                    if (currentLine.find("<<") != std::string::npos)
+                        continue;
+                }
+
+                multiline = false;
                 if (line.empty())
                     continue;
 
@@ -438,7 +480,7 @@ namespace spore
                     spore_message_destroy(msg);
                     msg = nullptr;
                 }
-                parser = spore_parser_create();
+                parser = spore_parser_create(trace);
                 msg = spore_message_create();
 
                 spore_parse(parser, line.c_str(), line.size(), msg);
@@ -559,7 +601,7 @@ namespace spore
                     default:
                         break;
                 }
-            }
+            };
         }
 
         spore_message_destroy(msg);

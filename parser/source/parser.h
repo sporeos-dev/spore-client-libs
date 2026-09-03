@@ -49,6 +49,7 @@ namespace spore
             SQUARES,
             CURLIES,
             PARENS,
+            TRIANGLES,
         };
 
         struct props_t

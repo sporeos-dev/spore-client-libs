@@ -27,7 +27,7 @@ extern "C"
     } spore_arg_t;
 
     // parser
-    spore_parser_t* spore_parser_create();
+    spore_parser_t* spore_parser_create(bool trace);
     void spore_parser_destroy(spore_parser_t* hParser);
     const char* spore_parser_get_raw(spore_parser_t* hParser);
     spore_parser_type_t spore_parser_get_type(spore_parser_t* hParser);

@@ -21,7 +21,7 @@ namespace spore
     class Client
     {
     public:
-        explicit Client(std::string_view nodeId);
+        explicit Client(std::string_view nodeId, bool trace);
         ~Client();
 
         bool isConnected() const;
@@ -31,6 +31,7 @@ namespace spore
 
         void connect();
         void disconnect();
+        void forceTrace();
 
         spore_handler_t* registerRequestHandler(spore_request_fn fn);
         spore_handler_t* registerResponseHandler(spore_response_fn fn);
@@ -57,6 +58,7 @@ namespace spore
         static std::string defaultSocketPath();
 
         std::string nodeId;
+        bool trace;
         socket_t socketFd = kInvalidSocket;
         bool connected = false;
         int nextId = 0;

@@ -46,6 +46,8 @@ namespace spore
         std::map<std::string, std::string> args;
         std::set<std::string> flags;
         mutable std::string serialized;
+
+        void serializeArg(std::string& s, const std::string& k, const std::string& v) const;
     };
 
 }  // namespace spore

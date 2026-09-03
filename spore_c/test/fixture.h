@@ -12,7 +12,7 @@ protected:
 
     void SetUp() override
     {
-        client = spore_client_create("test.node");
+        client = spore_client_create("test.node", false);
     }
 
     void TearDown() override

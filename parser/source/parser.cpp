@@ -1,6 +1,7 @@
 
 #include "defs.h"
 #include "spore_parser.h"
+#include "ptrace.h"
 #include <vector>
 #include <string>
 #include <string_view>
@@ -40,6 +41,9 @@ namespace spore
 
     void parser::parse(std::string_view message, spore_message_t* hMessage)
     {
+        Ptrace::msg("Parsing message", 0);
+        Ptrace::string("Raw", raw, 1);
+
         raw = message;
         errorCode.clear();
         errorWhat.clear();
@@ -53,9 +57,32 @@ namespace spore
         std::vector<token_t> tokens;
         props_t props;
 
+        // tokenize
+        Ptrace::msg("1 Tokenize", 1);
         tokenize(message, tokens);
+        Ptrace::num("Count", tokens.size(), 2);
+        for (const auto& el : tokens) Ptrace::string("Token", el.value, 2);
+
+        // build
+        Ptrace::msg("2 Build", 1);
         build(hMessage, tokens, props);
+        Ptrace::string("Capability", hMessage->message.getCapability(), 2);
+        Ptrace::string("Handle", hMessage->message.getHandle(), 2);
+        Ptrace::string("Inline", hMessage->message.getInline(), 2);
+        Ptrace::num("Args", hMessage->message.getArgs().size(), 2);
+        for (const auto& el : hMessage->message.getArgs()) Ptrace::string(el.pKey, el.pValue, 2);
+        Ptrace::num("Flags", hMessage->message.getFlags().size(), 2);
+        for (const auto& el : hMessage->message.getFlags()) Ptrace::list(el, 2);
+
+        // verify
+        Ptrace::msg("3 Verify", 1);
         verify(hMessage, props);
+        Ptrace::type(getType(), 2);
+        Ptrace::boolean("Error", hasError(), 2);
+        Ptrace::string("Error Code", getErrorCode(), 2);
+        Ptrace::string("Error What", getErrorWhat(), 2);
+
+        Ptrace::msg("Parsing complete", 0);
     }
 
     void parser::tokenize(std::string_view message, std::vector<token_t>& tokens)
@@ -69,8 +96,10 @@ namespace spore
         // & tokenize
         //
 
+        int next = 0;
         for (const auto& c : message)
         {
+            next++;
             switch (where)
             {
                     // inside
@@ -130,6 +159,19 @@ namespace spore
                             {
                                 curr.value.push_back(c);
                                 curr.type = token_t::type_t::HANDLE;
+                            }
+                            else
+                            {
+                                curr.value.push_back(c);
+                            }
+                        }
+                        break;
+                        case '<':
+                        {
+                            if (message.size() > next && message[next] == '<')
+                            {
+                                curr.value.push_back(c);
+                                where = inside::TRIANGLES;
                             }
                             else
                             {
@@ -228,6 +270,23 @@ namespace spore
                     }
                 }
                 break;
+
+                    // inside
+                    // triangles
+
+                case inside::TRIANGLES:
+                {
+                    if (c == '>' && message.size() > next && message[next] == '>')
+                    {
+                        curr.value.push_back(c);
+                        where = inside::NONE;
+                    }
+                    else
+                    {
+                        curr.value.push_back(c);
+                    }
+                }
+                break;
             }
         }
 
@@ -250,6 +309,11 @@ namespace spore
             case inside::PARENS:
                 error("Malformed", "parentheses not closed");
                 curr.value.push_back(')');
+                break;
+            case inside::TRIANGLES:
+                error("Malformed", "triangles not closed");
+                curr.value.push_back('>');
+                curr.value.push_back('>');
                 break;
             case inside::NONE:
                 // intentionally left blank
@@ -351,6 +415,18 @@ namespace spore
                             auto pos = t.value.find('=');
                             std::string key = t.value.substr(0, pos);
                             std::string value = t.value.substr(pos + 1);
+
+                            // strip block delimiters and trim one boundary newline on each side
+                            if (value.size() >= 4 && value[0] == '<' && value[1] == '<' &&
+                                value[value.size() - 2] == '>' && value[value.size() - 1] == '>')
+                            {
+                                value = value.substr(2, value.size() - 4);
+                                if (!value.empty() && value.front() == '\n')
+                                    value.erase(0, 1);
+                                if (!value.empty() && value.back() == '\n')
+                                    value.pop_back();
+                            }
+
                             if (key == "code")
                                 props.hasArgCode = true;
                             else if (key == "what")

@@ -10,8 +10,13 @@ namespace spore
             s = "~" + handle + ":" + command;
         else
             s = command;
-        for (const auto& f : flags) s += " " + f;
-        for (const auto& [k, v] : args) s += " " + k + "=" + v;
+        s += " ok";
+        for (const auto& f : flags)
+        {
+            if (f != "ok")
+                s += " " + f;
+        }
+        for (const auto& [k, v] : args) serializeArg(s, k, v);
         s += "\n";
         serialized = std::move(s);
     }
@@ -28,7 +33,7 @@ namespace spore
             s += " code=" + code;
         if (!what.empty())
             s += " what=" + what;
-        for (const auto& [k, v] : args) s += " " + k + "=" + v;
+        for (const auto& [k, v] : args) serializeArg(s, k, v);
         for (const auto& f : flags) s += " " + f;
         s += " node_error\n";
         serialized = std::move(s);

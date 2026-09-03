@@ -39,8 +39,9 @@ extern "C"
     // client
     //
 
-    spore_client_t* spore_client_create(const char* pNodeId);
+    spore_client_t* spore_client_create(const char* pNodeId, bool trace);
     void spore_client_destroy(spore_client_t* hClient);
+    void spore_client_force_trace(spore_client_t* hClient);
     void spore_client_connect(spore_client_t* hClient);
     void spore_client_disconnect(spore_client_t* hClient);
     bool spore_client_is_connected(spore_client_t* hClient);

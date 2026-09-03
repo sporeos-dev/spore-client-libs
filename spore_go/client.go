@@ -2,8 +2,9 @@ package spore
 
 import (
 	"fmt"
+	"os"
 	"runtime"
-	"strings"
+	"slices"
 
 	sporec "github.com/sporeos-dev/spore-client-libs/spore_go/internal/spore_c"
 	"github.com/sporeos-dev/spore-client-libs/spore_go/publish"
@@ -15,10 +16,14 @@ import (
 type Client struct {
 	nodeid string
 	h *sporec.Client
+	trace bool
 }
 
 func New(nodeid string) *Client {
-	c := &Client{nodeid: nodeid, h: sporec.ClientCreate(nodeid)}
+	c := &Client{
+		nodeid: nodeid, 
+		h: sporec.ClientCreate(nodeid, slices.Contains(os.Args, "trace")),
+	}
 	if sporec.ClientHasError(c.h) {
 		// the thought is that this really shouldn't fail
 		// but if it does, something should catch it
@@ -30,16 +35,17 @@ func New(nodeid string) *Client {
 	return c
 }
 
+func (c *Client) ForceTrace() *Client {
+	sporec.ClientForceTrace(c.h)
+	return c
+}
+
 // log to stdout &&
 // send witness information
 func (c *Client) WithDefaultErrorHandler() *Client {
 	c.OnParseError(func(code, what, raw string) {
 		fmt.Printf("Parse error: [%s] %s\n", code, what)
 		fmt.Printf("Raw: %s\n", raw)
-		c.SendWitness(witness.New(fmt.Sprintf(`Parse error: [%s] %s`, code, what)))
-		raw = strings.ReplaceAll(raw, "\n", "\\n")
-		raw = strings.ReplaceAll(raw, "\"", "\\\"")
-		c.SendWitness(witness.New(fmt.Sprintf(`Raw: %s`, raw)))
 	})
 	
 	return c
