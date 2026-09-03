@@ -48,7 +48,6 @@ namespace spore
             S_QUOTES,
             SQUARES,
             CURLIES,
-            PARENS,
             TRIANGLES,
         };
 

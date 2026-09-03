@@ -87,15 +87,13 @@ TEST_F(Tokenize, curlies)
     EXPECT_STREQ(tokens[2].value.c_str(), "body={some message}");
 }
 
-TEST_F(Tokenize, parens)
+TEST_F(Tokenize, parentheses_are_ordinary_characters)
 {
-    tokenize("Some ~h body=(some message) flag", tokens);
+    tokenize("Some ~h body=(value) flag", tokens);
     EXPECT_EQ(tokens.size(), 4);
-    EXPECT_EQ(tokens[0].type, token_t::type_t::NONE);
-    EXPECT_EQ(tokens[1].type, token_t::type_t::HANDLE);
     EXPECT_EQ(tokens[2].type, token_t::type_t::ARG);
-    EXPECT_EQ(tokens[3].type, token_t::type_t::NONE);
-    EXPECT_STREQ(tokens[2].value.c_str(), "body=(some message)");
+    EXPECT_STREQ(tokens[2].value.c_str(), "body=(value)");
+    EXPECT_FALSE(hasError());
 }
 
 TEST_F(Tokenize, triangles)
@@ -147,13 +145,6 @@ TEST_F(Tokenize, left_open)
         tokenize("Some ~h body={some message", tokens);
         EXPECT_EQ(tokens.size(), 3);
         EXPECT_STREQ(tokens[2].value.c_str(), "body={some message}");
-        tokens.clear();
-    }
-
-    {
-        tokenize("Some ~h body=(some message", tokens);
-        EXPECT_EQ(tokens.size(), 3);
-        EXPECT_STREQ(tokens[2].value.c_str(), "body=(some message)");
         tokens.clear();
     }
 }

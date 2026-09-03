@@ -16,7 +16,6 @@ namespace spore
         std::vector<spore_arg_t> argsC;
         std::vector<std::string> flags;
         std::vector<const char*> flagsC;
-        std::string inlineData;
 
     public:
         message() = default;
@@ -27,13 +26,11 @@ namespace spore
         std::string_view getHandle() const;
         std::vector<spore_arg_t>& getArgs();
         std::vector<const char*>& getFlags();
-        std::string_view getInline() const;
 
         // setters
         void setCapability(std::string_view cap);
         void setHandle(std::string_view handle);
         void addArg(std::string_view key, std::string_view value);
         void addFlag(std::string_view flag);
-        void setInline(std::string_view data);
     };
 }  // namespace spore

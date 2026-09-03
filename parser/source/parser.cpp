@@ -68,7 +68,6 @@ namespace spore
         build(hMessage, tokens, props);
         Ptrace::string("Capability", hMessage->message.getCapability(), 2);
         Ptrace::string("Handle", hMessage->message.getHandle(), 2);
-        Ptrace::string("Inline", hMessage->message.getInline(), 2);
         Ptrace::num("Args", hMessage->message.getArgs().size(), 2);
         for (const auto& el : hMessage->message.getArgs()) Ptrace::string(el.pKey, el.pValue, 2);
         Ptrace::num("Flags", hMessage->message.getFlags().size(), 2);
@@ -139,12 +138,6 @@ namespace spore
                         {
                             curr.value.push_back(c);
                             where = inside::CURLIES;
-                        }
-                        break;
-                        case '(':
-                        {
-                            curr.value.push_back(c);
-                            where = inside::PARENS;
                         }
                         break;
                         case '=':
@@ -255,23 +248,6 @@ namespace spore
                 break;
 
                     // inside
-                    // parentheses
-
-                case inside::PARENS:
-                {
-                    if (c == ')')
-                    {
-                        curr.value.push_back(c);
-                        where = inside::NONE;
-                    }
-                    else
-                    {
-                        curr.value.push_back(c);
-                    }
-                }
-                break;
-
-                    // inside
                     // triangles
 
                 case inside::TRIANGLES:
@@ -305,10 +281,6 @@ namespace spore
             case inside::CURLIES:
                 error("Malformed", "curly braces not closed");
                 curr.value.push_back('}');
-                break;
-            case inside::PARENS:
-                error("Malformed", "parentheses not closed");
-                curr.value.push_back(')');
                 break;
             case inside::TRIANGLES:
                 error("Malformed", "triangles not closed");

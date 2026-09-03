@@ -34,6 +34,14 @@ TEST_F(Request, error_start_arg)
     EXPECT_STREQ(spore_parser_get_error_code(parser), "Malformed");
 }
 
+TEST_F(Request, parentheses_are_ordinary_characters)
+{
+    parse("Something.something ~h arg=(value)");
+    EXPECT_EQ(spore_parser_get_type(parser), SPORE_PARSER_TYPE_REQUEST);
+    EXPECT_FALSE(spore_parser_has_error(parser));
+    EXPECT_STREQ(arg("arg").data(), "(value)");
+}
+
 TEST_F(Request, args_and_flags)
 {
     parse("Something.something ~h arg1=value1 arg2=value2 flag1 flag2");

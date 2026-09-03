@@ -42,7 +42,6 @@ extern "C"
     const char* spore_message_get_handle(spore_message_t* hMessage);
     const spore_arg_t* spore_message_get_args(spore_message_t* hMessage, size_t* pNum);
     const char** spore_message_get_flags(spore_message_t* hMessage, size_t* pNum);
-    const char* spore_message_get_inline(spore_message_t* hMessage);
 
     // parse
     // check hasError() after parse for error handling

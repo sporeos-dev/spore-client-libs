@@ -28,7 +28,6 @@ TEST_F(Basics, before)
     EXPECT_EQ(num, 0);
     EXPECT_EQ(spore_message_get_flags(message, &num), nullptr);
     EXPECT_EQ(num, 0);
-    EXPECT_EQ(spore_message_get_inline(message), nullptr);
 }
 
 TEST_F(Basics, raw)

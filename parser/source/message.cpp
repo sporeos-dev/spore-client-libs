@@ -28,11 +28,6 @@ namespace spore
         return flagsC;
     }
 
-    std::string_view message::getInline() const
-    {
-        return inlineData;
-    }
-
     void message::setCapability(std::string_view cap)
     {
         capability = cap;
@@ -51,10 +46,5 @@ namespace spore
     void message::addFlag(std::string_view flag)
     {
         flags.emplace_back(flag);
-    }
-
-    void message::setInline(std::string_view data)
-    {
-        inlineData = data;
     }
 }  // namespace spore

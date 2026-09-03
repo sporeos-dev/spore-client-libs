@@ -133,15 +133,6 @@ const char** spore_message_get_flags(spore_message_t* hMessage, size_t* pNum)
     return flags.data();
 }
 
-const char* spore_message_get_inline(spore_message_t* hMessage)
-{
-    if (!hMessage)
-        return nullptr;
-    if (hMessage->message.getInline().empty())
-        return nullptr;
-    return hMessage->message.getInline().data();
-}
-
 void spore_parse(spore_parser_t* hParser, const char* pMessage, size_t sz, spore_message_t* hParsed)
 {
     if (!hParser || !pMessage || !hParsed)
