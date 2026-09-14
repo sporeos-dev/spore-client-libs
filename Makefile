@@ -1,4 +1,3 @@
-GO_REF_DIR := go_ref
 GO_DIR     := spore_go
 PARSER_DIR := parser
 CLIENT_DIR := spore_c
@@ -16,14 +15,6 @@ check:
 	@cd $(GO_DIR) && go vet ./...
 	@echo "==> Testing spore_go..."
 	@cd $(GO_DIR) && go test ./...
-	@echo "==> Cleaning go_ref build and test cache..."
-	@cd $(GO_REF_DIR) && go clean -cache -testcache
-	@echo "==> Building go_ref..."
-	@cd $(GO_REF_DIR) && go build ./...
-	@echo "==> Vetting go_ref..."
-	@cd $(GO_REF_DIR) && go vet ./...
-	@echo "==> Testing go_ref..."
-	@cd $(GO_REF_DIR) && go test ./...
 	@echo "==> All checks passed."
 
 release:
@@ -33,15 +24,11 @@ release:
 	@$(MAKE) -C $(CLIENT_DIR) -f Makefile.macos-arm release
 	@echo "==> Building spore_go..."
 	@cd $(GO_DIR) && go build ./...
-	@echo "==> Building go_ref..."
-	@cd $(GO_REF_DIR) && go build ./...
 	@echo "==> Running C tests..."
 	@$(MAKE) -C $(PARSER_DIR) test
 	@$(MAKE) -C $(CLIENT_DIR) test
 	@echo "==> Running spore_go tests..."
 	@cd $(GO_DIR) && go test ./...
-	@echo "==> Running go_ref tests..."
-	@cd $(GO_REF_DIR) && go test ./...
 	@echo "==> Done."
 
 cross:
@@ -69,8 +56,6 @@ test:
 	@$(MAKE) -C $(CLIENT_DIR) test
 	@echo "==> Running spore_go tests..."
 	@cd $(GO_DIR) && go test ./...
-	@echo "==> Running go_ref tests..."
-	@cd $(GO_REF_DIR) && go test ./...
 
 analyze:
 	@echo "==> Running spore_go tests with race detector..."

@@ -44,11 +44,13 @@ extern "C"
     const char** spore_message_get_flags(spore_message_t* hMessage, size_t* pNum);
 
     // parse
-    // check hasError() after parse for error handling
     void spore_parse(spore_parser_t* hParser,
                      const char* pRaw,
                      size_t sz,
                      spore_message_t* hmessage);
+
+    // validate
+    void spore_validate(spore_parser_t* hParser, spore_message_t* hMessage);
 
 #ifdef __cplusplus
 }

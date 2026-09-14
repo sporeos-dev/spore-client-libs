@@ -47,15 +47,12 @@ namespace spore
         raw = message;
         errorCode.clear();
         errorWhat.clear();
+        props = props_t{};
 
         if (!hMessage)
-        {
-            error("Missing", "message handle is null");
             return;
-        }
 
         std::vector<token_t> tokens;
-        props_t props;
 
         // tokenize
         Ptrace::msg("1 Tokenize", 1);
@@ -65,21 +62,14 @@ namespace spore
 
         // build
         Ptrace::msg("2 Build", 1);
-        build(hMessage, tokens, props);
+        build(hMessage, tokens);
         Ptrace::string("Capability", hMessage->message.getCapability(), 2);
         Ptrace::string("Handle", hMessage->message.getHandle(), 2);
         Ptrace::num("Args", hMessage->message.getArgs().size(), 2);
         for (const auto& el : hMessage->message.getArgs()) Ptrace::string(el.pKey, el.pValue, 2);
         Ptrace::num("Flags", hMessage->message.getFlags().size(), 2);
         for (const auto& el : hMessage->message.getFlags()) Ptrace::list(el, 2);
-
-        // verify
-        Ptrace::msg("3 Verify", 1);
-        verify(hMessage, props);
         Ptrace::type(getType(), 2);
-        Ptrace::boolean("Error", hasError(), 2);
-        Ptrace::string("Error Code", getErrorCode(), 2);
-        Ptrace::string("Error What", getErrorWhat(), 2);
 
         Ptrace::msg("Parsing complete", 0);
     }
@@ -88,6 +78,8 @@ namespace spore
     {
         token_t curr;
         inside where = inside::NONE;
+        char bracket = 0;
+        size_t depth = 0;
 
         //
         //
@@ -129,15 +121,12 @@ namespace spore
                         }
                         break;
                         case '[':
-                        {
-                            curr.value.push_back(c);
-                            where = inside::SQUARES;
-                        }
-                        break;
                         case '{':
                         {
                             curr.value.push_back(c);
-                            where = inside::CURLIES;
+                            bracket = c;
+                            depth = 1;
+                            where = inside::BRACKETS;
                         }
                         break;
                         case '=':
@@ -214,35 +203,21 @@ namespace spore
                 break;
 
                     // inside
-                    // square brackets
+                    // square brackets or curly braces, tracked by depth of the same type
 
-                case inside::SQUARES:
+                case inside::BRACKETS:
                 {
-                    if (c == ']')
+                    const char close = bracket == '[' ? ']' : '}';
+                    curr.value.push_back(c);
+                    if (c == bracket)
                     {
-                        curr.value.push_back(c);
-                        where = inside::NONE;
+                        depth++;
                     }
-                    else
+                    else if (c == close)
                     {
-                        curr.value.push_back(c);
-                    }
-                }
-                break;
-
-                    // inside
-                    // curly braces
-
-                case inside::CURLIES:
-                {
-                    if (c == '}')
-                    {
-                        curr.value.push_back(c);
-                        where = inside::NONE;
-                    }
-                    else
-                    {
-                        curr.value.push_back(c);
+                        depth--;
+                        if (depth == 0)
+                            where = inside::NONE;
                     }
                 }
                 break;
@@ -266,28 +241,19 @@ namespace spore
             }
         }
 
+        // close anything left open, best effort
         switch (where)
         {
-            case inside::S_QUOTES:
-                error("Malformed", "single quotes not closed");
-                break;
-            case inside::QUOTES:
-                error("Malformed", "quotes not closed");
-                break;
-            case inside::SQUARES:
-                error("Malformed", "square brackets not closed");
-                curr.value.push_back(']');
-                break;
-            case inside::CURLIES:
-                error("Malformed", "curly braces not closed");
-                curr.value.push_back('}');
+            case inside::BRACKETS:
+                for (size_t i = 0; i < depth; ++i) curr.value.push_back(bracket == '[' ? ']' : '}');
                 break;
             case inside::TRIANGLES:
-                error("Malformed", "triangles not closed");
                 curr.value.push_back('>');
                 curr.value.push_back('>');
                 break;
             case inside::NONE:
+            case inside::QUOTES:
+            case inside::S_QUOTES:
                 // intentionally left blank
                 break;
         }
@@ -300,9 +266,7 @@ namespace spore
         }
     }
 
-    void parser::build(spore_message_t* hMessage,
-                       const std::vector<token_t>& tokens,
-                       props_t& props)
+    void parser::build(spore_message_t* hMessage, const std::vector<token_t>& tokens)
     {
         size_t i = 0;
 
@@ -315,7 +279,6 @@ namespace spore
                     case token_t::type_t::ARG:
                         type = SPORE_PARSER_TYPE_REQUEST;
                         hMessage->message.setCapability(t.value.c_str());
-                        error("Malformed", "first token cannot be argument");
                         break;
                     case token_t::type_t::HANDLE:
                     {
@@ -326,8 +289,6 @@ namespace spore
                         if (pos == std::string::npos)
                         {
                             hMessage->message.setHandle(std::string(handle).c_str());
-                            error("Malformed",
-                                  "response missing command; [ ~h ] should be [ ~h:c ]");
                         }
                         else
                         {
@@ -361,22 +322,6 @@ namespace spore
                 if (type == SPORE_PARSER_TYPE_PUBLISH && i == 1)
                 {
                     hMessage->message.setCapability(t.value.c_str());
-                    switch (t.type)
-                    {
-                        case token_t::type_t::ARG:
-                            error("Malformed",
-                                  "publish missing topic; cannot be argument; [ k=v ] should "
-                                  "be [ t ]");
-                            break;
-                        case token_t::type_t::HANDLE:
-                            error("Malformed",
-                                  "publish missing topic; cannot be handle; [ ~h ] should be [ "
-                                  "t ]");
-                            break;
-                        case token_t::type_t::NONE:
-                            // intentionally left blank
-                            break;
-                    }
                 }
                 else
                 {
@@ -430,14 +375,27 @@ namespace spore
         }
     }
 
-    void parser::verify(spore_message_t* hMessage, const props_t& props)
+    void parser::validate(spore_message_t* hMessage)
     {
+        Ptrace::msg("Validating message", 0);
+
+        errorCode.clear();
+        errorWhat.clear();
+
+        if (!hMessage)
+        {
+            error("Missing", "message handle is null");
+            return;
+        }
+
         switch (type)
         {
             case SPORE_PARSER_TYPE_REQUEST:
             {
                 if (hMessage->message.getCapability().empty())
                     error("Malformed", "request missing command");
+                else if (hMessage->message.getCapability().find('=') != std::string_view::npos)
+                    error("Malformed", "first token cannot be argument");
                 else if (hMessage->message.getHandle().empty())
                     error("Malformed", "request missing handle");
             }
@@ -446,7 +404,7 @@ namespace spore
             case SPORE_PARSER_TYPE_RESPONSE:
             {
                 if (hMessage->message.getCapability().empty())
-                    error("Malformed", "response missing command");
+                    error("Malformed", "response missing command; [ ~h ] should be [ ~h:c ]");
                 else if (hMessage->message.getHandle().empty())
                     error("Malformed", "response missing handle");
                 else if (!props.hasFlagOk && !props.hasFlagError)
@@ -471,6 +429,12 @@ namespace spore
             {
                 if (hMessage->message.getCapability().empty())
                     error("Malformed", "publish missing topic");
+                else if (hMessage->message.getCapability().find('=') != std::string_view::npos)
+                    error("Malformed",
+                          "publish missing topic; cannot be argument; [ k=v ] should be [ t ]");
+                else if (hMessage->message.getCapability().front() == '~')
+                    error("Malformed",
+                          "publish missing topic; cannot be handle; [ ~h ] should be [ t ]");
             }
             break;
 
@@ -478,5 +442,11 @@ namespace spore
                 error("Malformed", "unknown message type");
                 break;
         }
+
+        Ptrace::type(getType(), 1);
+        Ptrace::boolean("Error", hasError(), 1);
+        Ptrace::string("Error Code", getErrorCode(), 1);
+        Ptrace::string("Error What", getErrorWhat(), 1);
+        Ptrace::msg("Validation complete", 0);
     }
 }  // namespace spore

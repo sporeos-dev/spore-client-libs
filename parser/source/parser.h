@@ -3,16 +3,28 @@
 #include "spore_parser.h"
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace spore
 {
     class parser
     {
+    protected:
+        struct props_t
+        {
+            bool hasFlagOk = false;
+            bool hasFlagError = false;
+            bool hasArgCode = false;
+            bool hasArgWhat = false;
+            bool hasArgBody = false;
+        };
+
     private:
         std::string raw;
         spore_parser_type_t type = SPORE_PARSER_TYPE_UNKNOWN;
         std::string errorCode;
         std::string errorWhat;
+        props_t props;
 
         void error(std::string_view code, std::string_view what);
 
@@ -27,6 +39,7 @@ namespace spore
         std::string_view getErrorWhat() const;
 
         void parse(std::string_view message, spore_message_t* hMessage);
+        void validate(spore_message_t* hMessage);
 
     protected:
         struct token_t
@@ -46,22 +59,11 @@ namespace spore
             NONE,
             QUOTES,
             S_QUOTES,
-            SQUARES,
-            CURLIES,
+            BRACKETS,
             TRIANGLES,
         };
 
-        struct props_t
-        {
-            bool hasFlagOk = false;
-            bool hasFlagError = false;
-            bool hasArgCode = false;
-            bool hasArgWhat = false;
-            bool hasArgBody = false;
-        };
-
         void tokenize(std::string_view message, std::vector<token_t>& tokens);
-        void build(spore_message_t* hMessage, const std::vector<token_t>& tokens, props_t& props);
-        void verify(spore_message_t* hMessage, const props_t& props);
+        void build(spore_message_t* hMessage, const std::vector<token_t>& tokens);
     };
 }  // namespace spore

@@ -165,7 +165,7 @@ spore_request_t* spore_request_create_from_raw(const char* pRaw, size_t sz)
     auto* m = spore_message_create();
     spore_parse(p, pRaw, sz, m);
     spore_request_t* result = nullptr;
-    if (!spore_parser_has_error(p) && spore_parser_get_type(p) == SPORE_PARSER_TYPE_REQUEST)
+    if (spore_parser_get_type(p) == SPORE_PARSER_TYPE_REQUEST)
     {
         result = new spore_request_t{};
         populateMessage(result->request, m);
@@ -272,7 +272,7 @@ spore_response_t* spore_response_create_from_raw(const char* pRaw, size_t sz)
     auto* m = spore_message_create();
     spore_parse(p, pRaw, sz, m);
     spore_response_t* result = nullptr;
-    if (!spore_parser_has_error(p) && spore_parser_get_type(p) == SPORE_PARSER_TYPE_RESPONSE)
+    if (spore_parser_get_type(p) == SPORE_PARSER_TYPE_RESPONSE)
     {
         result = new spore_response_t{};
         populateMessage(result->response, m);
@@ -379,7 +379,7 @@ spore_response_error_t* spore_response_error_create_from_raw(const char* pRaw, s
     auto* m = spore_message_create();
     spore_parse(p, pRaw, sz, m);
     spore_response_error_t* result = nullptr;
-    if (!spore_parser_has_error(p) && spore_parser_get_type(p) == SPORE_PARSER_TYPE_RESPONSE)
+    if (spore_parser_get_type(p) == SPORE_PARSER_TYPE_RESPONSE)
     {
         result = new spore_response_error_t{};
         populateMessage(result->error, m);
@@ -526,7 +526,7 @@ spore_witness_t* spore_witness_create_from_raw(const char* pRaw, size_t sz)
     auto* m = spore_message_create();
     spore_parse(p, pRaw, sz, m);
     spore_witness_t* result = nullptr;
-    if (!spore_parser_has_error(p) && spore_parser_get_type(p) == SPORE_PARSER_TYPE_WITNESS)
+    if (spore_parser_get_type(p) == SPORE_PARSER_TYPE_WITNESS)
     {
         result = new spore_witness_t{};
         // body is a named arg; remaining args/flags go through populateMessage
@@ -631,7 +631,7 @@ spore_publish_t* spore_publish_create_from_raw(const char* pRaw, size_t sz)
     auto* m = spore_message_create();
     spore_parse(p, pRaw, sz, m);
     spore_publish_t* result = nullptr;
-    if (!spore_parser_has_error(p) && spore_parser_get_type(p) == SPORE_PARSER_TYPE_PUBLISH)
+    if (spore_parser_get_type(p) == SPORE_PARSER_TYPE_PUBLISH)
     {
         result = new spore_publish_t{};
         // capability is the topic for publish messages

@@ -87,6 +87,47 @@ TEST_F(Tokenize, curlies)
     EXPECT_STREQ(tokens[2].value.c_str(), "body={some message}");
 }
 
+TEST_F(Tokenize, nested_curlies)
+{
+    tokenize("Some ~h body={a {b c} d} flag", tokens);
+    EXPECT_EQ(tokens.size(), 4);
+    EXPECT_EQ(tokens[2].type, token_t::type_t::ARG);
+    EXPECT_STREQ(tokens[2].value.c_str(), "body={a {b c} d}");
+    EXPECT_EQ(tokens[3].type, token_t::type_t::NONE);
+    EXPECT_STREQ(tokens[3].value.c_str(), "flag");
+}
+
+TEST_F(Tokenize, nested_squares)
+{
+    tokenize("Some ~h body=[a [b c] d] flag", tokens);
+    EXPECT_EQ(tokens.size(), 4);
+    EXPECT_STREQ(tokens[2].value.c_str(), "body=[a [b c] d]");
+    EXPECT_STREQ(tokens[3].value.c_str(), "flag");
+}
+
+TEST_F(Tokenize, nested_mixed)
+{
+    tokenize("Some ~h body={\"a\": [1, {\"b\": 2}]} flag", tokens);
+    EXPECT_EQ(tokens.size(), 4);
+    EXPECT_STREQ(tokens[2].value.c_str(), "body={\"a\": [1, {\"b\": 2}]}");
+    EXPECT_STREQ(tokens[3].value.c_str(), "flag");
+}
+
+TEST_F(Tokenize, nested_only_same_type)
+{
+    tokenize("Some ~h body={a [b} flag", tokens);
+    EXPECT_EQ(tokens.size(), 4);
+    EXPECT_STREQ(tokens[2].value.c_str(), "body={a [b}");
+    EXPECT_STREQ(tokens[3].value.c_str(), "flag");
+}
+
+TEST_F(Tokenize, nested_left_open)
+{
+    tokenize("Some ~h body={a {b c", tokens);
+    EXPECT_EQ(tokens.size(), 3);
+    EXPECT_STREQ(tokens[2].value.c_str(), "body={a {b c}}");
+}
+
 TEST_F(Tokenize, parentheses_are_ordinary_characters)
 {
     tokenize("Some ~h body=(value) flag", tokens);

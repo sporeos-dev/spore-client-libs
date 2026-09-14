@@ -36,6 +36,11 @@ protected:
         makeFlags();
     }
 
+    void validate()
+    {
+        spore_validate(parser, message);
+    }
+
     void makeArgs()
     {
         size_t num = 0;

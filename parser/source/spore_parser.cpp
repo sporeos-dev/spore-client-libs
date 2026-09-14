@@ -141,3 +141,10 @@ void spore_parse(spore_parser_t* hParser, const char* pMessage, size_t sz, spore
     std::string_view message(pMessage, sz);
     hParser->parser.parse(message, hParsed);
 }
+
+void spore_validate(spore_parser_t* hParser, spore_message_t* hMessage)
+{
+    if (!hParser)
+        return;
+    hParser->parser.validate(hMessage);
+}

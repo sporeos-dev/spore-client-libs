@@ -10,6 +10,7 @@ protected:
 TEST_F(Response, basic)
 {
     parse("~handle:Something.something ok");
+    validate();
     EXPECT_EQ(spore_parser_get_type(parser), SPORE_PARSER_TYPE_RESPONSE);
     EXPECT_FALSE(spore_parser_has_error(parser));
     EXPECT_STREQ(spore_message_get_capability(message), "Something.something");
@@ -21,6 +22,9 @@ TEST_F(Response, error_missing_command)
 {
     parse("~handle ok");
     EXPECT_EQ(spore_parser_get_type(parser), SPORE_PARSER_TYPE_RESPONSE);
+    EXPECT_STREQ(spore_message_get_handle(message), "handle");
+    EXPECT_FALSE(spore_parser_has_error(parser));
+    validate();
     EXPECT_TRUE(spore_parser_has_error(parser));
     EXPECT_STREQ(spore_parser_get_error_code(parser), "Malformed");
 }
@@ -28,6 +32,7 @@ TEST_F(Response, error_missing_command)
 TEST_F(Response, error_missing_ok_error)
 {
     parse("~handle:Something.something");
+    validate();
     EXPECT_EQ(spore_parser_get_type(parser), SPORE_PARSER_TYPE_RESPONSE);
     EXPECT_TRUE(spore_parser_has_error(parser));
     EXPECT_STREQ(spore_parser_get_error_code(parser), "Malformed");
@@ -36,6 +41,7 @@ TEST_F(Response, error_missing_ok_error)
 TEST_F(Response, error_both_ok_error)
 {
     parse("~handle:Something.something ok error");
+    validate();
     EXPECT_EQ(spore_parser_get_type(parser), SPORE_PARSER_TYPE_RESPONSE);
     EXPECT_TRUE(spore_parser_has_error(parser));
     EXPECT_STREQ(spore_parser_get_error_code(parser), "Malformed");
@@ -44,6 +50,7 @@ TEST_F(Response, error_both_ok_error)
 TEST_F(Response, error_missing_code)
 {
     parse("~handle:Something.something error what=\"some message\"");
+    validate();
     EXPECT_EQ(spore_parser_get_type(parser), SPORE_PARSER_TYPE_RESPONSE);
     EXPECT_TRUE(spore_parser_has_error(parser));
     EXPECT_STREQ(spore_parser_get_error_code(parser), "Malformed");
@@ -52,6 +59,7 @@ TEST_F(Response, error_missing_code)
 TEST_F(Response, error_missing_what)
 {
     parse("~handle:Something.something error code=123");
+    validate();
     EXPECT_EQ(spore_parser_get_type(parser), SPORE_PARSER_TYPE_RESPONSE);
     EXPECT_TRUE(spore_parser_has_error(parser));
     EXPECT_STREQ(spore_parser_get_error_code(parser), "Malformed");

@@ -10,6 +10,7 @@ protected:
 TEST_F(Witness, basic)
 {
     parse("witness body=\"some message\"");
+    validate();
     EXPECT_EQ(spore_parser_get_type(parser), SPORE_PARSER_TYPE_WITNESS);
     EXPECT_FALSE(spore_parser_has_error(parser));
 }
@@ -32,6 +33,8 @@ TEST_F(Witness, missing_body)
 {
     parse("witness flag1");
     EXPECT_EQ(spore_parser_get_type(parser), SPORE_PARSER_TYPE_WITNESS);
+    EXPECT_FALSE(spore_parser_has_error(parser));
+    validate();
     EXPECT_TRUE(spore_parser_has_error(parser));
     EXPECT_STREQ(spore_parser_get_error_code(parser), "Malformed");
 }

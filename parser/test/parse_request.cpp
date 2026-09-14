@@ -10,6 +10,7 @@ protected:
 TEST_F(Request, basic)
 {
     parse("Something.something ~handle");
+    validate();
     EXPECT_EQ(spore_parser_get_type(parser), SPORE_PARSER_TYPE_REQUEST);
     EXPECT_FALSE(spore_parser_has_error(parser));
     EXPECT_STREQ(spore_message_get_capability(message), "Something.something");
@@ -21,6 +22,8 @@ TEST_F(Request, error_missing_handle)
     parse("Something.something arg=value flag1");
     EXPECT_EQ(spore_parser_get_type(parser), SPORE_PARSER_TYPE_REQUEST);
     EXPECT_STREQ(spore_message_get_capability(message), "Something.something");
+    EXPECT_FALSE(spore_parser_has_error(parser));
+    validate();
     EXPECT_TRUE(spore_parser_has_error(parser));
     EXPECT_STREQ(spore_parser_get_error_code(parser), "Malformed");
 }
@@ -30,6 +33,8 @@ TEST_F(Request, error_start_arg)
     parse("arg=value Something.something ~h");
     EXPECT_EQ(spore_parser_get_type(parser), SPORE_PARSER_TYPE_REQUEST);
     EXPECT_STREQ(spore_message_get_capability(message), "arg=value");
+    EXPECT_FALSE(spore_parser_has_error(parser));
+    validate();
     EXPECT_TRUE(spore_parser_has_error(parser));
     EXPECT_STREQ(spore_parser_get_error_code(parser), "Malformed");
 }

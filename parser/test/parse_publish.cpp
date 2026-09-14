@@ -10,6 +10,7 @@ protected:
 TEST_F(Publish, basic)
 {
     parse("publish Something.something");
+    validate();
     EXPECT_EQ(spore_parser_get_type(parser), SPORE_PARSER_TYPE_PUBLISH);
     EXPECT_FALSE(spore_parser_has_error(parser));
 }
@@ -18,6 +19,8 @@ TEST_F(Publish, error_missing_topic)
 {
     parse("publish");
     EXPECT_EQ(spore_parser_get_type(parser), SPORE_PARSER_TYPE_PUBLISH);
+    EXPECT_FALSE(spore_parser_has_error(parser));
+    validate();
     EXPECT_TRUE(spore_parser_has_error(parser));
     EXPECT_STREQ(spore_parser_get_error_code(parser), "Malformed");
 }
@@ -25,6 +28,7 @@ TEST_F(Publish, error_missing_topic)
 TEST_F(Publish, error_topic_is_arg)
 {
     parse("publish arg=value topic");
+    validate();
     EXPECT_EQ(spore_parser_get_type(parser), SPORE_PARSER_TYPE_PUBLISH);
     EXPECT_TRUE(spore_parser_has_error(parser));
     EXPECT_STREQ(spore_parser_get_error_code(parser), "Malformed");

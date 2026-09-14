@@ -484,6 +484,7 @@ namespace spore
                 msg = spore_message_create();
 
                 spore_parse(parser, line.c_str(), line.size(), msg);
+                spore_validate(parser, msg);
                 if (spore_parser_has_error(parser))
                 {
                     for (auto* h : parseErrorHandlers)
