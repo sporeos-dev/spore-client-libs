@@ -1,3 +1,8 @@
+/*
+ * Copyright 2026 Matt Harrison
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #include "_cgo_export.h"
 #include "spore_c.h"
 

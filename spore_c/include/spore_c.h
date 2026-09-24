@@ -1,3 +1,8 @@
+/*
+ * Copyright 2026 Matt Harrison
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #ifndef SPORE_C_H
 #define SPORE_C_H
 

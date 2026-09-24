@@ -1,4 +1,4 @@
-# Toolchain: native Apple Clang on macOS (Apple Silicon)
+# Toolchain: native Apple Clang on macOS (Intel)
 # Requires: Xcode Command Line Tools (xcode-select --install)
 
 ROOT  := $(abspath ..)
@@ -7,10 +7,10 @@ LIB   := libspore_parser.a
 LIB_D := libspore_parser_d.a
 SRCS  := $(wildcard source/*.cpp)
 
-CXX   := clang++
-AR    := ar
+CXX   ?= c++
+AR    ?= ar
 
-CXXFLAGS_COMMON  := -std=c++17 -arch arm64 -Iinclude -Isource
+CXXFLAGS_COMMON  := -std=c++17 -arch x86_64 -Iinclude -Isource
 CXXFLAGS_RELEASE := $(CXXFLAGS_COMMON) -O2 -DNDEBUG
 CXXFLAGS_DEBUG   := $(CXXFLAGS_COMMON) -g -O0 -DDEBUG
 

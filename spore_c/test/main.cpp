@@ -1,3 +1,6 @@
+// Copyright 2026 Matt Harrison
+// SPDX-License-Identifier: Apache-2.0
+
 #include <gtest/gtest.h>
 
 // Change to run a subset, e.g. "Fixture.*" or "Fixture.CreateDestroy"

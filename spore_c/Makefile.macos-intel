@@ -1,4 +1,4 @@
-# Toolchain: native Apple Clang on macOS (Apple Silicon)
+# Toolchain: native Apple Clang on macOS (Intel)
 # Requires: Xcode Command Line Tools (xcode-select --install)
 
 ROOT  := $(abspath ..)
@@ -12,10 +12,10 @@ LIB_SHARED_D := libspore_c_d.dylib
 
 SRCS := $(wildcard source/*.cpp)
 
-CXX  := clang++
-AR   := ar
+CXX  ?= c++
+AR   ?= ar
 
-CXXFLAGS_COMMON  := -std=c++17 -arch arm64 -fPIC -Iinclude -Isource -I../parser/include
+CXXFLAGS_COMMON  := -std=c++17 -arch x86_64 -fPIC -Iinclude -Isource -I../parser/include
 CXXFLAGS_RELEASE := $(CXXFLAGS_COMMON) -O2 -DNDEBUG
 CXXFLAGS_DEBUG   := $(CXXFLAGS_COMMON) -g -O0 -DDEBUG
 
@@ -33,13 +33,13 @@ $(DIST)/$(LIB_STATIC): $(RELEASE_OBJS) | $(DIST)
 	$(AR) rcs $@ $^
 
 $(DIST)/$(LIB_SHARED): $(RELEASE_OBJS) $(PARSER_LIBRARY) | $(DIST)
-	$(CXX) -arch arm64 -dynamiclib -o $@ $(RELEASE_OBJS) $(PARSER_LIBRARY)
+	$(CXX) -arch x86_64 -dynamiclib -o $@ $(RELEASE_OBJS) $(PARSER_LIBRARY)
 
 $(DIST)/$(LIB_STATIC_D): $(DEBUG_OBJS) | $(DIST)
 	$(AR) rcs $@ $^
 
 $(DIST)/$(LIB_SHARED_D): $(DEBUG_OBJS) $(PARSER_LIBRARY) | $(DIST)
-	$(CXX) -arch arm64 -dynamiclib -o $@ $(DEBUG_OBJS) $(PARSER_LIBRARY)
+	$(CXX) -arch x86_64 -dynamiclib -o $@ $(DEBUG_OBJS) $(PARSER_LIBRARY)
 
 source/%.o: source/%.cpp
 	$(CXX) $(CXXFLAGS_RELEASE) -c $< -o $@

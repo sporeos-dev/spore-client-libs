@@ -1,31 +1,31 @@
-# Toolchain: musl-cross x86_64 (static, no glibc dependency)
-# Install on macOS: brew install FiloSottile/musl-cross/musl-cross
-# or: brew install x86_64-unknown-linux-musl (via SergioBenitez/homebrew-osxct)
+# Toolchain: native C++ compiler on Linux (Intel)
 
 ROOT  := $(abspath ..)
-DIST  := $(ROOT)/dist/linux-intel
+DIST  := $(ROOT)/dist
 LIB   := libspore_parser.a
 SRCS  := $(wildcard source/*.cpp)
 
-CXX   := x86_64-linux-musl-g++
-AR    := x86_64-linux-musl-ar
+CXX   ?= c++
+AR    ?= ar
 
-CXXFLAGS_COMMON  := -std=c++17 -Iinclude -Isource -static-libstdc++ -static-libgcc
+CXXFLAGS_COMMON  := -std=c++17 -Iinclude -Isource
 CXXFLAGS_RELEASE := $(CXXFLAGS_COMMON) -O2 -DNDEBUG
 CXXFLAGS_DEBUG   := $(CXXFLAGS_COMMON) -g -O0 -DDEBUG
 
 RELEASE_OBJS := $(patsubst source/%.cpp,source/%.o,$(SRCS))
 DEBUG_OBJS   := $(patsubst source/%.cpp,source/%_d.o,$(SRCS))
 
-.PHONY: release debug clean
+.PHONY: check analyze release debug clean
 
-release: $(DIST)/release/$(LIB)
-debug:   $(DIST)/debug/$(LIB)
+THIS_MAKEFILE := $(lastword $(MAKEFILE_LIST))
 
-$(DIST)/release/$(LIB): $(RELEASE_OBJS) | $(DIST)/release
+release: $(DIST)/$(LIB)
+debug:   $(DIST)/$(LIB_D)
+
+$(DIST)/$(LIB): $(RELEASE_OBJS) | $(DIST)
 	$(AR) rcs $@ $^
 
-$(DIST)/debug/$(LIB): $(DEBUG_OBJS) | $(DIST)/debug
+$(DIST)/$(LIB_D): $(DEBUG_OBJS) | $(DIST)
 	$(AR) rcs $@ $^
 
 source/%.o: source/%.cpp
@@ -34,9 +34,19 @@ source/%.o: source/%.cpp
 source/%_d.o: source/%.cpp
 	$(CXX) $(CXXFLAGS_DEBUG) -c $< -o $@
 
-$(DIST)/release $(DIST)/debug:
+$(DIST):
 	@mkdir -p $@
 
 clean:
-	@rm -rf $(DIST)
-	@rm -f $(RELEASE_OBJS) $(DEBUG_OBJS)
+	@rm -f $(DIST)/$(LIB) $(DIST)/$(LIB_D) $(RELEASE_OBJS) $(DEBUG_OBJS)
+
+include Makefile.test
+
+check:
+	@$(MAKE) -f $(THIS_MAKEFILE) clean
+	@$(MAKE) -f $(THIS_MAKEFILE) release
+	@$(MAKE) -f $(THIS_MAKEFILE) clean-test
+	@$(MAKE) -f $(THIS_MAKEFILE) test
+
+analyze:
+	@echo "==> No analysis checks configured."

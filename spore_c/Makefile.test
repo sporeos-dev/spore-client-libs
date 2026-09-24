@@ -1,18 +1,9 @@
-# Builds and runs tests natively (host platform only).
-# Cross-compiled targets cannot be executed on the build machine.
-#
-# Requires: Xcode Command Line Tools
-
 ROOT     := $(abspath ..)
 GTEST    := $(ROOT)/../libs/googletest/googletest
 
-TEST_BIN := $(ROOT)/dist/spore_c_test
+TEST_BIN := $(DIST)/spore_c_test
 
-CXX      := clang++
-CXXFLAGS := -std=c++17 -arch arm64 \
-            -Iinclude -Isource \
-            -I../parser/include \
-            -I$(GTEST)/include
+CXXFLAGS_TEST := $(CXXFLAGS_COMMON) -I$(GTEST)/include
 
 SRCS     := $(wildcard source/*.cpp) \
             $(GTEST)/src/gtest-all.cc \
@@ -25,11 +16,13 @@ FILTER   ?=
 test: $(TEST_BIN)
 	@$(TEST_BIN) $(if $(FILTER),--gtest_filter=$(FILTER),)
 
-$(TEST_BIN): $(SRCS) | $(ROOT)/dist
-	$(CXX) $(CXXFLAGS) -I$(GTEST) $^ $(ROOT)/dist/libspore_parser.a -o $@ -lpthread
+$(TEST_BIN): $(SRCS) $(PARSER_LIBRARY) | $(DIST)
+	$(CXX) $(CXXFLAGS_TEST) -I$(GTEST) $(SRCS) $(PARSER_LIBRARY) -o $@ -lpthread
 
-$(ROOT)/dist:
-	@mkdir -p $@
+$(PARSER_LIBRARY):
+	@echo "Parser library does not exist: $(PARSER_LIBRARY)"
+	@echo "Run make check in ../parser first."
+	@false
 
 clean-test:
 	@rm -f $(TEST_BIN)

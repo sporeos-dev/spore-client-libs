@@ -1,10 +1,8 @@
-# Toolchain: llvm-mingw aarch64 (LLVM-based MinGW for Windows on ARM)
-# Install: download from https://github.com/mstorsjo/llvm-mingw/releases
-# then add its bin/ directory to PATH, e.g.:
-#   export PATH="/opt/llvm-mingw/bin:$PATH"
+# Toolchain: native GNU-compatible C++ compiler on Windows (ARM)
 
 ROOT  := $(abspath ..)
-DIST  := $(ROOT)/dist/windows-arm
+DIST  := $(ROOT)/dist
+PARSER_LIBRARY := $(ROOT)/dist/libspore_parser.a
 
 LIB_STATIC   := libspore_c.a
 LIB_STATIC_D := libspore_c_d.a
@@ -13,18 +11,19 @@ LIB_SHARED_D := spore_client_d.dll
 
 SRCS := $(wildcard source/*.cpp)
 
-CXX  := aarch64-w64-mingw32-clang++
-AR   := aarch64-w64-mingw32-ar
+CXX  ?= c++
+AR   ?= ar
 
-CXXFLAGS_COMMON  := -std=c++17 -fPIC -Iinclude -Isource -I../parser/include \
-                    -static-libstdc++ -static-libgcc
+CXXFLAGS_COMMON  := -std=c++17 -fPIC -Iinclude -Isource -I../parser/include
 CXXFLAGS_RELEASE := $(CXXFLAGS_COMMON) -O2 -DNDEBUG
 CXXFLAGS_DEBUG   := $(CXXFLAGS_COMMON) -g -O0 -DDEBUG
 
 RELEASE_OBJS := $(patsubst source/%.cpp,source/%.o,$(SRCS))
 DEBUG_OBJS   := $(patsubst source/%.cpp,source/%_d.o,$(SRCS))
 
-.PHONY: release debug clean
+.PHONY: check analyze release debug clean
+
+THIS_MAKEFILE := $(lastword $(MAKEFILE_LIST))
 
 release: $(DIST)/$(LIB_STATIC) $(DIST)/$(LIB_SHARED)
 debug:   $(DIST)/$(LIB_STATIC_D) $(DIST)/$(LIB_SHARED_D)
@@ -32,7 +31,7 @@ debug:   $(DIST)/$(LIB_STATIC_D) $(DIST)/$(LIB_SHARED_D)
 $(DIST)/$(LIB_STATIC): $(RELEASE_OBJS) | $(DIST)
 	$(AR) rcs $@ $^
 
-$(DIST)/$(LIB_SHARED): $(RELEASE_OBJS) | $(DIST)
+$(DIST)/$(LIB_SHARED): $(RELEASE_OBJS) $(PARSER_LIBRARY) | $(DIST)
 	$(CXX) -shared -o $@ $^
 
 $(DIST)/$(LIB_STATIC_D): $(DEBUG_OBJS) | $(DIST)
@@ -54,3 +53,14 @@ clean:
 	@rm -f $(DIST)/$(LIB_STATIC) $(DIST)/$(LIB_STATIC_D) \
 	       $(DIST)/$(LIB_SHARED) $(DIST)/$(LIB_SHARED_D) \
 	       $(RELEASE_OBJS) $(DEBUG_OBJS)
+
+include Makefile.test
+
+check:
+	@$(MAKE) -f $(THIS_MAKEFILE) clean
+	@$(MAKE) -f $(THIS_MAKEFILE) release
+	@$(MAKE) -f $(THIS_MAKEFILE) clean-test
+	@$(MAKE) -f $(THIS_MAKEFILE) test
+
+analyze:
+	@echo "==> No analysis checks configured."
