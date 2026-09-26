@@ -441,7 +441,7 @@ namespace spore
                     // only enter multiline mode if this line's block isn't
                     // already closed by a ">>" later on the same line
                     bool selfClosed = openPos != std::string::npos &&
-                                       currentLine.find(">>", openPos + 2) != std::string::npos;
+                                      currentLine.find(">>", openPos + 2) != std::string::npos;
                     if (openPos != std::string::npos && !selfClosed)
                     {
                         multiline = true;
