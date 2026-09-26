@@ -4,7 +4,6 @@
 
 #include "defs.h"
 #include "spore_parser.h"
-#include "ptrace.h"
 #include <vector>
 #include <string>
 #include <string_view>
@@ -44,9 +43,6 @@ namespace spore
 
     void parser::parse(std::string_view message, spore_message_t* hMessage)
     {
-        Ptrace::msg("Parsing message", 0);
-        Ptrace::string("Raw", raw, 1);
-
         raw = message;
         errorCode.clear();
         errorWhat.clear();
@@ -58,23 +54,10 @@ namespace spore
         std::vector<token_t> tokens;
 
         // tokenize
-        Ptrace::msg("1 Tokenize", 1);
         tokenize(message, tokens);
-        Ptrace::num("Count", tokens.size(), 2);
-        for (const auto& el : tokens) Ptrace::string("Token", el.value, 2);
 
         // build
-        Ptrace::msg("2 Build", 1);
         build(hMessage, tokens);
-        Ptrace::string("Capability", hMessage->message.getCapability(), 2);
-        Ptrace::string("Handle", hMessage->message.getHandle(), 2);
-        Ptrace::num("Args", hMessage->message.getArgs().size(), 2);
-        for (const auto& el : hMessage->message.getArgs()) Ptrace::string(el.pKey, el.pValue, 2);
-        Ptrace::num("Flags", hMessage->message.getFlags().size(), 2);
-        for (const auto& el : hMessage->message.getFlags()) Ptrace::list(el, 2);
-        Ptrace::type(getType(), 2);
-
-        Ptrace::msg("Parsing complete", 0);
     }
 
     void parser::tokenize(std::string_view message, std::vector<token_t>& tokens)
@@ -380,8 +363,6 @@ namespace spore
 
     void parser::validate(spore_message_t* hMessage)
     {
-        Ptrace::msg("Validating message", 0);
-
         errorCode.clear();
         errorWhat.clear();
 
@@ -445,11 +426,5 @@ namespace spore
                 error("Malformed", "unknown message type");
                 break;
         }
-
-        Ptrace::type(getType(), 1);
-        Ptrace::boolean("Error", hasError(), 1);
-        Ptrace::string("Error Code", getErrorCode(), 1);
-        Ptrace::string("Error What", getErrorWhat(), 1);
-        Ptrace::msg("Validation complete", 0);
     }
 }  // namespace spore

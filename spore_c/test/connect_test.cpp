@@ -24,7 +24,7 @@ TEST_F(Fixture, InitiallyNoError)
 
 TEST_F(Fixture, CreateNullNodeIdReturnsNull)
 {
-    EXPECT_EQ(spore_client_create(nullptr, false), nullptr);
+    EXPECT_EQ(spore_client_create(nullptr), nullptr);
 }
 
 // --- Connection (no daemon running) ---

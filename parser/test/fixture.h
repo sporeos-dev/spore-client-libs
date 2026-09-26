@@ -21,7 +21,7 @@ protected:
 
     void SetUp() override
     {
-        parser = spore_parser_create(false);
+        parser = spore_parser_create();
         message = spore_message_create();
     }
 

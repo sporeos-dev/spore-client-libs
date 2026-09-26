@@ -27,7 +27,7 @@
 
 namespace spore
 {
-    Client::Client(std::string_view id, bool trace) : nodeId(id), trace(trace)
+    Client::Client(std::string_view id) : nodeId(id)
     {
     }
 
@@ -194,11 +194,6 @@ namespace spore
             socketFd = kInvalidSocket;
         }
         connected = false;
-    }
-
-    void Client::forceTrace()
-    {
-        trace = true;
     }
 
     // --- Handler registration ---
@@ -488,7 +483,7 @@ namespace spore
                     spore_message_destroy(msg);
                     msg = nullptr;
                 }
-                parser = spore_parser_create(trace);
+                parser = spore_parser_create();
                 msg = spore_message_create();
 
                 spore_parse(parser, line.c_str(), line.size(), msg);

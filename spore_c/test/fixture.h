@@ -17,7 +17,7 @@ protected:
 
     void SetUp() override
     {
-        client = spore_client_create("test.node", false);
+        client = spore_client_create("test.node");
     }
 
     void TearDown() override

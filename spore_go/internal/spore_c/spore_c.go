@@ -29,15 +29,13 @@ type Publish = C.spore_publish_t
 // client
 //
 
-func ClientCreate(nodeID string, trace bool) *Client {
+func ClientCreate(nodeID string) *Client {
 	cs := C.CString(nodeID)
 	defer C.free(unsafe.Pointer(cs))
-	t := C.bool(trace)
-	return C.spore_client_create(cs, t)
+	return C.spore_client_create(cs)
 }
 
 func ClientDestroy(c *Client)        { C.spore_client_destroy(c) }
-func ClientForceTrace(c *Client)     { C.spore_client_force_trace(c) }
 func ClientConnect(c *Client)        { C.spore_client_connect(c) }
 func ClientDisconnect(c *Client)     { C.spore_client_disconnect(c) }
 func ClientIsConnected(c *Client) bool { return bool(C.spore_client_is_connected(c)) }

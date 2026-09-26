@@ -5,9 +5,7 @@ package spore
 
 import (
 	"fmt"
-	"os"
 	"runtime"
-	"slices"
 
 	sporec "github.com/sporeos-dev/spore-client-libs/spore_go/internal/spore_c"
 	"github.com/sporeos-dev/spore-client-libs/spore_go/publish"
@@ -19,13 +17,12 @@ import (
 type Client struct {
 	nodeid string
 	h *sporec.Client
-	trace bool
 }
 
 func New(nodeid string) *Client {
 	c := &Client{
 		nodeid: nodeid, 
-		h: sporec.ClientCreate(nodeid, slices.Contains(os.Args, "trace")),
+		h: sporec.ClientCreate(nodeid),
 	}
 	if sporec.ClientHasError(c.h) {
 		// the thought is that this really shouldn't fail
@@ -35,11 +32,6 @@ func New(nodeid string) *Client {
 		return nil
 	}
 	runtime.SetFinalizer(c, (*Client).destroy)
-	return c
-}
-
-func (c *Client) ForceTrace() *Client {
-	sporec.ClientForceTrace(c.h)
 	return c
 }
 

@@ -4,15 +4,12 @@
 
 #include "spore_parser.h"
 #include "defs.h"
-#include "ptrace.h"
 
 #include <stdlib.h>
 #include <string.h>
 
-spore_parser_t* spore_parser_create(bool trace)
+spore_parser_t* spore_parser_create()
 {
-    if (trace)
-        Ptrace::enable();
     return new spore_parser_t();
 }
 
