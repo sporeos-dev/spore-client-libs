@@ -6,7 +6,7 @@ package sporec
 /*
 #cgo CFLAGS: -I../../../spore_c/include
 #cgo darwin LDFLAGS: -L../../../dist -lspore_c -lspore_parser -lc++
-#cgo linux  LDFLAGS: -L../../../dist -lspore_c -lspore_parser -lstdc++
+#cgo linux  LDFLAGS: -L../../../dist -l:libspore_c.a -l:libspore_parser.a -lstdc++
 #include "spore_c.h"
 #include <stdlib.h>
 */
