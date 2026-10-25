@@ -25,9 +25,9 @@ ifndef PLATFORM
 	$(error Unsupported host platform: $(HOST_OS) $(HOST_ARCH))
 endif
 
-.PHONY: all check analyze
+.PHONY: all check analyze release debug clean
 
 all: check
 
-check analyze:
+check analyze release debug clean:
 	@$(MAKE) -f Makefile.$(PLATFORM) $@
