@@ -1,7 +1,7 @@
 ROOT     := $(abspath ..)
 GTEST    := $(ROOT)/../libs/googletest/googletest
 
-TEST_BIN := $(DIST)/parser_test
+TEST_BIN := $(DIST)/parser_test$(EXEEXT)
 
 CXXFLAGS_TEST := $(CXXFLAGS_COMMON) -I$(GTEST)/include
 
@@ -20,4 +20,8 @@ $(TEST_BIN): $(SRCS) | $(ROOT)/dist
 	$(CXX) $(CXXFLAGS_TEST) -I$(GTEST) $^ -o $@ -lpthread
 
 clean-test:
+ifeq ($(EXEEXT),.exe)
+	@powershell.exe -NoProfile -Command "if (Test-Path -LiteralPath '$(subst /,\,$(TEST_BIN))' -ErrorAction Stop) { Remove-Item -LiteralPath '$(subst /,\,$(TEST_BIN))' -Force -ErrorAction Stop }"
+else
 	@rm -f $(TEST_BIN)
+endif

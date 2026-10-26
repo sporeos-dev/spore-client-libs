@@ -14,8 +14,8 @@
     #include <afunix.h>
     #pragma comment(lib, "ws2_32.lib")
     #define SPORE_CLOSE(fd) closesocket(fd)
-    #define SPORE_WRITE(fd, buf, len) send(fd, buf, (int)(len), 0)
-    #define SPORE_READ(fd, buf, le``n) recv(fd, buf, (int)(len), 0)
+    #define SPORE_WRITE(fd, buf, len) ::send(fd, buf, (int)(len), 0)
+    #define SPORE_READ(fd, buf, len) ::recv(fd, buf, (int)(len), 0)
 #else
     #include <sys/socket.h>
     #include <sys/un.h>
@@ -71,10 +71,10 @@ namespace spore
 #elif defined(__linux__)
         return "/var/lib/spore-os/spore.sock";
 #elif defined(_WIN32)
-        const char* base = std::getenv("LOCALAPPDATA");
-        if (base)
+        const char* base = std::getenv("ProgramData");
+        if (base && *base)
             return std::string(base) + R"(\spore-os\spore.sock)";
-        return R"(C:\Users\Default\AppData\Local\spore-os\spore.sock)";
+        return R"(C:\ProgramData\spore-os\spore.sock)";
 #else
         return "/tmp/spore.sock";
 #endif

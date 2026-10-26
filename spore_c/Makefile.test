@@ -1,7 +1,7 @@
 ROOT     := $(abspath ..)
 GTEST    := $(ROOT)/../libs/googletest/googletest
 
-TEST_BIN := $(DIST)/spore_c_test
+TEST_BIN := $(DIST)/spore_c_test$(EXEEXT)
 
 CXXFLAGS_TEST := $(CXXFLAGS_COMMON) -I$(GTEST)/include
 
@@ -17,7 +17,7 @@ test: $(TEST_BIN)
 	@$(TEST_BIN) $(if $(FILTER),--gtest_filter=$(FILTER),)
 
 $(TEST_BIN): $(SRCS) $(PARSER_LIBRARY) | $(DIST)
-	$(CXX) $(CXXFLAGS_TEST) -I$(GTEST) $(SRCS) $(PARSER_LIBRARY) -o $@ -lpthread
+	$(CXX) $(CXXFLAGS_TEST) -I$(GTEST) $(SRCS) $(PARSER_LIBRARY) -o $@ -lpthread $(SYSTEM_LIBS)
 
 $(PARSER_LIBRARY):
 	@echo "Parser library does not exist: $(PARSER_LIBRARY)"
@@ -25,4 +25,8 @@ $(PARSER_LIBRARY):
 	@false
 
 clean-test:
+ifeq ($(EXEEXT),.exe)
+	@powershell.exe -NoProfile -Command "if (Test-Path -LiteralPath '$(subst /,\,$(TEST_BIN))' -ErrorAction Stop) { Remove-Item -LiteralPath '$(subst /,\,$(TEST_BIN))' -Force -ErrorAction Stop }"
+else
 	@rm -f $(TEST_BIN)
+endif

@@ -1,5 +1,10 @@
-HOST_OS := $(shell uname -s)
-HOST_ARCH := $(shell uname -m)
+ifeq ($(OS),Windows_NT)
+	HOST_OS := Windows_NT
+	HOST_ARCH := $(PROCESSOR_ARCHITECTURE)
+else
+	HOST_OS := $(shell uname -s)
+	HOST_ARCH := $(shell uname -m)
+endif
 
 ifeq ($(HOST_OS),Darwin)
 	ifeq ($(HOST_ARCH),arm64)
@@ -19,10 +24,16 @@ else ifneq ($(filter MINGW% MSYS%,$(HOST_OS)),)
 	else
 		PLATFORM := windows-intel
 	endif
+else ifeq ($(HOST_OS),Windows_NT)
+	ifneq ($(filter ARM64 arm64 aarch64,$(HOST_ARCH)),)
+		PLATFORM := windows-arm
+	else
+		PLATFORM := windows-intel
+	endif
 endif
 
 ifndef PLATFORM
-	$(error Unsupported host platform: $(HOST_OS) $(HOST_ARCH))
+$(error Unsupported host platform: $(HOST_OS) $(HOST_ARCH))
 endif
 
 .PHONY: all check analyze
@@ -30,4 +41,4 @@ endif
 all: check
 
 check analyze:
-	@$(MAKE) -f Makefile.$(PLATFORM) $@
+	@"$(MAKE)" -f Makefile.$(PLATFORM) $@
