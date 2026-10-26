@@ -3,6 +3,7 @@
 ROOT  := $(abspath ..)
 DIST  := $(ROOT)/dist
 LIB   := libspore_parser.a
+LIB_D := libspore_parser_d.a
 SRCS  := $(wildcard source/*.cpp)
 
 CXX   ?= c++

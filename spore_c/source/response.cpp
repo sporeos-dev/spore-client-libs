@@ -35,7 +35,7 @@ namespace spore
         if (!code.empty())
             s += " code=" + code;
         if (!what.empty())
-            s += " what=" + what;
+            s += " what=\"" + what + "\"";
         for (const auto& [k, v] : args) serializeArg(s, k, v);
         for (const auto& f : flags) s += " " + f;
         s += " node_error\n";

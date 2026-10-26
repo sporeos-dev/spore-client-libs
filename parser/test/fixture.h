@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <gtest/gtest.h>
 #include "spore_parser.h"
 
