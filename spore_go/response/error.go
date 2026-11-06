@@ -23,8 +23,8 @@ func Error(command string, handle string, code string, what string) *ResponseErr
 	return re
 }
 
-func ErrorFromC(h *sporec.ResponseError) *ResponseError { 
-	return &ResponseError{h: h} 
+func ErrorFromC(h *sporec.ResponseError) *ResponseError {
+	return &ResponseError{h: h}
 }
 
 func (re *ResponseError) destroy() {
@@ -79,10 +79,11 @@ func (re *ResponseError) Flag(flag string) bool {
 	return sporec.ResponseErrorHasFlag(re.h, flag)
 }
 
+func (re *ResponseError) Args() []string  { return sporec.ResponseErrorGetArgIds(re.h) }
+func (re *ResponseError) Flags() []string { return sporec.ResponseErrorGetFlags(re.h) }
+func (re *ResponseError) Raw() string     { return sporec.ResponseErrorGetRaw(re.h) }
+
 func (re *ResponseError) Serialize() string {
 	sporec.ResponseErrorSerialize(re.h)
 	return sporec.ResponseErrorGetSerialized(re.h)
 }
-
-
-

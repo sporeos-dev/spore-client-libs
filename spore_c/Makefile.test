@@ -16,7 +16,7 @@ FILTER   ?=
 test: $(TEST_BIN)
 	@$(TEST_BIN) $(if $(FILTER),--gtest_filter=$(FILTER),)
 
-$(TEST_BIN): $(SRCS) $(PARSER_LIBRARY) | $(DIST)
+$(TEST_BIN): $(SRCS) $(wildcard source/*.h include/*.h ../parser/include/*.h) $(PARSER_LIBRARY) | $(DIST)
 	$(CXX) $(CXXFLAGS_TEST) -I$(GTEST) $(SRCS) $(PARSER_LIBRARY) -o $@ -lpthread $(SYSTEM_LIBS)
 
 $(PARSER_LIBRARY):

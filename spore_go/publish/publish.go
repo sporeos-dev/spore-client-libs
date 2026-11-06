@@ -62,6 +62,18 @@ func (p *Publish) Flag(flag string) bool {
 	return sporec.PublishHasFlag(p.h, flag)
 }
 
+func (p *Publish) Args() []string {
+	return sporec.PublishGetArgIds(p.h)
+}
+
+func (p *Publish) Flags() []string {
+	return sporec.PublishGetFlags(p.h)
+}
+
+func (p *Publish) Raw() string {
+	return sporec.PublishGetRaw(p.h)
+}
+
 func (p *Publish) H() *sporec.Publish { return p.h }
 
 func (p *Publish) Serialize() string {

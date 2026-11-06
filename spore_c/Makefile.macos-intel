@@ -28,6 +28,7 @@ THIS_MAKEFILE := $(lastword $(MAKEFILE_LIST))
 
 release: $(DIST)/$(LIB_STATIC) $(DIST)/$(LIB_SHARED)
 debug:   $(DIST)/$(LIB_STATIC_D) $(DIST)/$(LIB_SHARED_D)
+$(RELEASE_OBJS) $(DEBUG_OBJS): $(wildcard source/*.h include/*.h ../parser/include/*.h)
 
 $(DIST)/$(LIB_STATIC): $(RELEASE_OBJS) | $(DIST)
 	$(AR) rcs $@ $^

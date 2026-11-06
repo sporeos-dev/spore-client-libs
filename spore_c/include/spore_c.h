@@ -95,6 +95,13 @@ extern "C"
     const char* spore_request_get_handle(const spore_request_t* hRequest);
     const char* spore_request_get_arg(const spore_request_t* hRequest, const char* pKey);
     bool spore_request_has_flag(const spore_request_t* hRequest, const char* pFlag);
+    size_t spore_request_get_arg_ids(const spore_request_t* hRequest,
+                                     const char** out,
+                                     size_t capacity);
+    size_t spore_request_get_flags(const spore_request_t* hRequest,
+                                   const char** out,
+                                   size_t capacity);
+    const char* spore_request_get_raw(const spore_request_t* hRequest, size_t* size);
 
     // send
     void spore_request_send(spore_client_t* hClient, const spore_request_t* hRequest);
@@ -125,6 +132,13 @@ extern "C"
     const char* spore_response_get_handle(const spore_response_t* hResponse);
     const char* spore_response_get_arg(const spore_response_t* hResponse, const char* pKey);
     bool spore_response_has_flag(const spore_response_t* hResponse, const char* pFlag);
+    size_t spore_response_get_arg_ids(const spore_response_t* hResponse,
+                                      const char** out,
+                                      size_t capacity);
+    size_t spore_response_get_flags(const spore_response_t* hResponse,
+                                    const char** out,
+                                    size_t capacity);
+    const char* spore_response_get_raw(const spore_response_t* hResponse, size_t* size);
 
     // send
     void spore_response_send(spore_client_t* hClient, const spore_response_t* hResponse);
@@ -162,6 +176,13 @@ extern "C"
     const char* spore_response_error_get_arg(const spore_response_error_t* hError,
                                              const char* pKey);
     bool spore_response_error_has_flag(const spore_response_error_t* hError, const char* pFlag);
+    size_t spore_response_error_get_arg_ids(const spore_response_error_t* hError,
+                                            const char** out,
+                                            size_t capacity);
+    size_t spore_response_error_get_flags(const spore_response_error_t* hError,
+                                          const char** out,
+                                          size_t capacity);
+    const char* spore_response_error_get_raw(const spore_response_error_t* hError, size_t* size);
 
     // send
     void spore_response_error_send(spore_client_t* hClient, const spore_response_error_t* hError);
@@ -189,6 +210,13 @@ extern "C"
     const char* spore_witness_get_body(const spore_witness_t* hWitness);
     const char* spore_witness_get_arg(const spore_witness_t* hWitness, const char* pKey);
     bool spore_witness_has_flag(const spore_witness_t* hWitness, const char* pFlag);
+    size_t spore_witness_get_arg_ids(const spore_witness_t* hWitness,
+                                     const char** out,
+                                     size_t capacity);
+    size_t spore_witness_get_flags(const spore_witness_t* hWitness,
+                                   const char** out,
+                                   size_t capacity);
+    const char* spore_witness_get_raw(const spore_witness_t* hWitness, size_t* size);
 
     // send
     void spore_witness_send(spore_client_t* hClient, const spore_witness_t* hWitness);
@@ -216,6 +244,13 @@ extern "C"
     const char* spore_publish_get_topic(const spore_publish_t* hPublish);
     const char* spore_publish_get_arg(const spore_publish_t* hPublish, const char* pKey);
     bool spore_publish_has_flag(const spore_publish_t* hPublish, const char* pFlag);
+    size_t spore_publish_get_arg_ids(const spore_publish_t* hPublish,
+                                     const char** out,
+                                     size_t capacity);
+    size_t spore_publish_get_flags(const spore_publish_t* hPublish,
+                                   const char** out,
+                                   size_t capacity);
+    const char* spore_publish_get_raw(const spore_publish_t* hPublish, size_t* size);
 
     // send
     void spore_publish_send(spore_client_t* hClient, const spore_publish_t* hPublish);

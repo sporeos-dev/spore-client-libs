@@ -412,6 +412,7 @@ namespace spore
         buf.reserve(4096);
         char tmp[1024];
         std::string line;
+        std::string rawLine;
         bool multiline = false;
 
         spore_parser_t* parser = nullptr;
@@ -429,6 +430,7 @@ namespace spore
             while ((pos = buf.find('\n')) != std::string::npos)
             {
                 std::string currentLine = buf.substr(0, pos);
+                rawLine.append(buf, 0, pos + 1);
                 buf.erase(0, pos + 1);
 
                 // strip \r for Windows line endings
@@ -471,7 +473,10 @@ namespace spore
 
                 multiline = false;
                 if (line.empty())
+                {
+                    rawLine.clear();
                     continue;
+                }
 
                 if (parser)
                 {
@@ -495,6 +500,7 @@ namespace spore
                                         spore_parser_get_error_code(parser),
                                         spore_parser_get_error_what(parser),
                                         line.c_str());
+                    rawLine.clear();
                     continue;
                 }
 
@@ -503,6 +509,7 @@ namespace spore
                     case SPORE_PARSER_TYPE_REQUEST:
                     {
                         spore_request_t req{};
+                        req.request.setRaw(rawLine);
                         req.request.setCommand(spore_message_get_capability(msg)
                                                    ? spore_message_get_capability(msg)
                                                    : "");
@@ -525,8 +532,7 @@ namespace spore
                         const char** flags = spore_message_get_flags(msg, &nf);
                         bool isError = false;
                         for (size_t i = 0; i < nf; ++i)
-                            if (std::string_view(flags[i]) == "error" ||
-                                std::string_view(flags[i]) == "custom_error")
+                            if (std::string_view(flags[i]) == "error")
                             {
                                 isError = true;
                                 break;
@@ -535,6 +541,7 @@ namespace spore
                         if (isError)
                         {
                             spore_response_error_t err{};
+                            err.error.setRaw(rawLine);
                             err.error.setCommand(spore_message_get_capability(msg));
                             err.error.setHandle(spore_message_get_handle(msg));
                             size_t na = 0;
@@ -555,6 +562,7 @@ namespace spore
                         else
                         {
                             spore_response_t resp{};
+                            resp.response.setRaw(rawLine);
                             resp.response.setCommand(spore_message_get_capability(msg)
                                                          ? spore_message_get_capability(msg)
                                                          : "");
@@ -572,6 +580,7 @@ namespace spore
                     case SPORE_PARSER_TYPE_WITNESS:
                     {
                         spore_witness_t wit{};
+                        wit.witness.setRaw(rawLine);
                         size_t na = 0;
                         const spore_arg_t* args = spore_message_get_args(msg, &na);
                         for (size_t i = 0; i < na; ++i)
@@ -590,6 +599,7 @@ namespace spore
                     case SPORE_PARSER_TYPE_PUBLISH:
                     {
                         spore_publish_t pub{};
+                        pub.publish.setRaw(rawLine);
                         if (const char* cap = spore_message_get_capability(msg))
                             pub.publish.setTopic(cap);
                         size_t na = 0;
@@ -605,6 +615,7 @@ namespace spore
                     default:
                         break;
                 }
+                rawLine.clear();
             };
         }
 

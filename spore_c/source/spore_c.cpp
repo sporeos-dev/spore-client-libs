@@ -12,18 +12,88 @@ static const char* sv(std::string_view s)
     return s.empty() ? nullptr : s.data();
 }
 
+static void parseRaw(spore_parser_t* parser, const char* raw, size_t size, spore_message_t* message)
+{
+    std::string input;
+    input.reserve(size);
+    for (size_t i = 0; i < size; ++i)
+    {
+        if (raw[i] == '\r' && i + 1 < size && raw[i + 1] == '\n')
+            continue;
+        input += raw[i];
+    }
+    if (!input.empty() && input.back() == '\n')
+        input.pop_back();
+    spore_parse(parser, input.data(), input.size(), message);
+}
+
 // Populate a Message from a parsed spore_message_t (args + flags).
-static void populateMessage(spore::Message& msg, spore_message_t* m)
+static void populateMessage(spore::Message& msg, spore_message_t* m, bool skipErrorFields = false)
 {
     msg.setCommand(spore_message_get_capability(m) ? spore_message_get_capability(m) : "");
     msg.setHandle(spore_message_get_handle(m) ? spore_message_get_handle(m) : "");
     size_t nArgs = 0;
     const spore_arg_t* args = spore_message_get_args(m, &nArgs);
-    for (size_t i = 0; i < nArgs; ++i) msg.addArg(args[i].pKey, args[i].pValue);
+    for (size_t i = 0; i < nArgs; ++i)
+    {
+        std::string_view key(args[i].pKey);
+        if (!skipErrorFields || (key != "code" && key != "what"))
+            msg.addArg(key, args[i].pValue);
+    }
     size_t nFlags = 0;
     const char** flags = spore_message_get_flags(m, &nFlags);
     for (size_t i = 0; i < nFlags; ++i) msg.addFlag(flags[i]);
 }
+
+static size_t copyArgIds(const spore::Message& msg, const char** out, size_t capacity)
+{
+    const auto& args = msg.getArgsMap();
+    size_t i = 0;
+    for (const auto& arg : args)
+    {
+        if (out && i < capacity)
+            out[i] = arg.first.c_str();
+        ++i;
+    }
+    return args.size();
+}
+
+static size_t copyFlags(const spore::Message& msg, const char** out, size_t capacity)
+{
+    const auto& flags = msg.getFlagsSet();
+    size_t i = 0;
+    for (const auto& flag : flags)
+    {
+        if (out && i < capacity)
+            out[i] = flag.c_str();
+        ++i;
+    }
+    return flags.size();
+}
+
+#define SPORE_MESSAGE_ACCESSORS(name, type, member)                                      \
+    size_t spore_##name##_get_arg_ids(const type* h, const char** out, size_t capacity)  \
+    {                                                                                    \
+        return h ? copyArgIds(h->member, out, capacity) : 0;                              \
+    }                                                                                    \
+    size_t spore_##name##_get_flags(const type* h, const char** out, size_t capacity)    \
+    {                                                                                    \
+        return h ? copyFlags(h->member, out, capacity) : 0;                               \
+    }                                                                                    \
+    const char* spore_##name##_get_raw(const type* h, size_t* size)                      \
+    {                                                                                    \
+        const auto raw = h ? h->member.getRaw() : std::string_view{};                     \
+        if (size) *size = raw.size();                                                     \
+        return raw.data();                                                               \
+    }
+
+SPORE_MESSAGE_ACCESSORS(request, spore_request_t, request)
+SPORE_MESSAGE_ACCESSORS(response, spore_response_t, response)
+SPORE_MESSAGE_ACCESSORS(response_error, spore_response_error_t, error)
+SPORE_MESSAGE_ACCESSORS(witness, spore_witness_t, witness)
+SPORE_MESSAGE_ACCESSORS(publish, spore_publish_t, publish)
+
+#undef SPORE_MESSAGE_ACCESSORS
 
 // ============================================================
 // client
@@ -156,12 +226,13 @@ spore_request_t* spore_request_create_from_raw(const char* pRaw, size_t sz)
         return nullptr;
     auto* p = spore_parser_create();
     auto* m = spore_message_create();
-    spore_parse(p, pRaw, sz, m);
+    parseRaw(p, pRaw, sz, m);
     spore_request_t* result = nullptr;
     if (spore_parser_get_type(p) == SPORE_PARSER_TYPE_REQUEST)
     {
         result = new spore_request_t{};
         populateMessage(result->request, m);
+        result->request.setRaw(std::string_view(pRaw, sz));
     }
     spore_message_destroy(m);
     spore_parser_destroy(p);
@@ -263,12 +334,13 @@ spore_response_t* spore_response_create_from_raw(const char* pRaw, size_t sz)
         return nullptr;
     auto* p = spore_parser_create();
     auto* m = spore_message_create();
-    spore_parse(p, pRaw, sz, m);
+    parseRaw(p, pRaw, sz, m);
     spore_response_t* result = nullptr;
     if (spore_parser_get_type(p) == SPORE_PARSER_TYPE_RESPONSE)
     {
         result = new spore_response_t{};
         populateMessage(result->response, m);
+        result->response.setRaw(std::string_view(pRaw, sz));
     }
     spore_message_destroy(m);
     spore_parser_destroy(p);
@@ -370,12 +442,13 @@ spore_response_error_t* spore_response_error_create_from_raw(const char* pRaw, s
         return nullptr;
     auto* p = spore_parser_create();
     auto* m = spore_message_create();
-    spore_parse(p, pRaw, sz, m);
+    parseRaw(p, pRaw, sz, m);
     spore_response_error_t* result = nullptr;
     if (spore_parser_get_type(p) == SPORE_PARSER_TYPE_RESPONSE)
     {
         result = new spore_response_error_t{};
-        populateMessage(result->error, m);
+        populateMessage(result->error, m, true);
+        result->error.setRaw(std::string_view(pRaw, sz));
         // extract code and what from the args map into dedicated fields
         size_t n = 0;
         const spore_arg_t* args = spore_message_get_args(m, &n);
@@ -517,11 +590,12 @@ spore_witness_t* spore_witness_create_from_raw(const char* pRaw, size_t sz)
         return nullptr;
     auto* p = spore_parser_create();
     auto* m = spore_message_create();
-    spore_parse(p, pRaw, sz, m);
+    parseRaw(p, pRaw, sz, m);
     spore_witness_t* result = nullptr;
     if (spore_parser_get_type(p) == SPORE_PARSER_TYPE_WITNESS)
     {
         result = new spore_witness_t{};
+        result->witness.setRaw(std::string_view(pRaw, sz));
         // body is a named arg; remaining args/flags go through populateMessage
         size_t n = 0;
         const spore_arg_t* args = spore_message_get_args(m, &n);
@@ -622,11 +696,12 @@ spore_publish_t* spore_publish_create_from_raw(const char* pRaw, size_t sz)
         return nullptr;
     auto* p = spore_parser_create();
     auto* m = spore_message_create();
-    spore_parse(p, pRaw, sz, m);
+    parseRaw(p, pRaw, sz, m);
     spore_publish_t* result = nullptr;
     if (spore_parser_get_type(p) == SPORE_PARSER_TYPE_PUBLISH)
     {
         result = new spore_publish_t{};
+        result->publish.setRaw(std::string_view(pRaw, sz));
         // capability is the topic for publish messages
         if (const char* cap = spore_message_get_capability(m))
             result->publish.setTopic(cap);

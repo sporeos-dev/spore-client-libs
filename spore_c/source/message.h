@@ -40,6 +40,9 @@ namespace spore
             return flags;
         }
 
+        void setRaw(std::string_view value) { raw = value; }
+        std::string_view getRaw() const { return raw; }
+
         const char* getSerialized() const
         {
             return serialized.empty() ? nullptr : serialized.c_str();
@@ -50,6 +53,7 @@ namespace spore
         std::string handle;
         std::map<std::string, std::string> args;
         std::set<std::string> flags;
+        std::string raw;
         mutable std::string serialized;
 
         void serializeArg(std::string& s, const std::string& k, const std::string& v) const;

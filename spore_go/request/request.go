@@ -21,8 +21,8 @@ func New(command string, handle string) *Request {
 	return r
 }
 
-func FromC(h *sporec.Request) *Request { 
-	return &Request{h: h} 
+func FromC(h *sporec.Request) *Request {
+	return &Request{h: h}
 }
 
 func (r *Request) destroy() {
@@ -61,10 +61,14 @@ func (r *Request) ArgIf(key string, def string) string {
 		return v
 	}
 	return def
-}	
+}
 
 func (r *Request) Flag(flag string) bool {
 	return sporec.RequestHasFlag(r.h, flag)
 }
+
+func (r *Request) Args() []string  { return sporec.RequestGetArgIds(r.h) }
+func (r *Request) Flags() []string { return sporec.RequestGetFlags(r.h) }
+func (r *Request) Raw() string     { return sporec.RequestGetRaw(r.h) }
 
 func (r *Request) H() *sporec.Request { return r.h }

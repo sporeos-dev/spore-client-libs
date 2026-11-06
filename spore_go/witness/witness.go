@@ -58,6 +58,10 @@ func (w *Witness) Flag(flag string) bool {
 	return sporec.WitnessHasFlag(w.h, flag)
 }
 
+func (w *Witness) Args() []string  { return sporec.WitnessGetArgIds(w.h) }
+func (w *Witness) Flags() []string { return sporec.WitnessGetFlags(w.h) }
+func (w *Witness) Raw() string     { return sporec.WitnessGetRaw(w.h) }
+
 func (w *Witness) H() *sporec.Witness { return w.h }
 
 // FromC wraps a raw C witness received via callback — does not own the memory.

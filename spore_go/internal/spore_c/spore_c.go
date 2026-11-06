@@ -25,6 +25,29 @@ type ResponseError = C.spore_response_error_t
 type Witness = C.spore_witness_t
 type Publish = C.spore_publish_t
 
+func getStrings(get func(**C.char, C.size_t) C.size_t) []string {
+	count := int(get(nil, 0))
+	if count == 0 {
+		return []string{}
+	}
+	values := make([]*C.char, count)
+	get(&values[0], C.size_t(count))
+	result := make([]string, count)
+	for i, value := range values {
+		result[i] = C.GoString(value)
+	}
+	return result
+}
+
+func getRaw(get func(*C.size_t) *C.char) string {
+	var size C.size_t
+	data := get(&size)
+	if size == 0 {
+		return ""
+	}
+	return string(unsafe.Slice((*byte)(unsafe.Pointer(data)), int(size)))
+}
+
 //
 // client
 //
@@ -106,6 +129,15 @@ func RequestHasFlag(r *Request, flag string) bool {
 	defer C.free(unsafe.Pointer(cs))
 	return bool(C.spore_request_has_flag(r, cs))
 }
+func RequestGetArgIds(r *Request) []string {
+	return getStrings(func(out **C.char, n C.size_t) C.size_t { return C.spore_request_get_arg_ids(r, out, n) })
+}
+func RequestGetFlags(r *Request) []string {
+	return getStrings(func(out **C.char, n C.size_t) C.size_t { return C.spore_request_get_flags(r, out, n) })
+}
+func RequestGetRaw(r *Request) string {
+	return getRaw(func(n *C.size_t) *C.char { return C.spore_request_get_raw(r, n) })
+}
 
 // send/serialize
 func RequestSend(c *Client, r *Request)      { C.spore_request_send(c, r) }
@@ -161,6 +193,15 @@ func ResponseHasFlag(r *Response, flag string) bool {
 	cs := C.CString(flag)
 	defer C.free(unsafe.Pointer(cs))
 	return bool(C.spore_response_has_flag(r, cs))
+}
+func ResponseGetArgIds(r *Response) []string {
+	return getStrings(func(out **C.char, n C.size_t) C.size_t { return C.spore_response_get_arg_ids(r, out, n) })
+}
+func ResponseGetFlags(r *Response) []string {
+	return getStrings(func(out **C.char, n C.size_t) C.size_t { return C.spore_response_get_flags(r, out, n) })
+}
+func ResponseGetRaw(r *Response) string {
+	return getRaw(func(n *C.size_t) *C.char { return C.spore_response_get_raw(r, n) })
 }
 
 // send/serialize
@@ -238,6 +279,15 @@ func ResponseErrorHasFlag(e *ResponseError, flag string) bool {
 	defer C.free(unsafe.Pointer(cs))
 	return bool(C.spore_response_error_has_flag(e, cs))
 }
+func ResponseErrorGetArgIds(e *ResponseError) []string {
+	return getStrings(func(out **C.char, n C.size_t) C.size_t { return C.spore_response_error_get_arg_ids(e, out, n) })
+}
+func ResponseErrorGetFlags(e *ResponseError) []string {
+	return getStrings(func(out **C.char, n C.size_t) C.size_t { return C.spore_response_error_get_flags(e, out, n) })
+}
+func ResponseErrorGetRaw(e *ResponseError) string {
+	return getRaw(func(n *C.size_t) *C.char { return C.spore_response_error_get_raw(e, n) })
+}
 
 // send/serialize
 func ResponseErrorSend(c *Client, e *ResponseError) { C.spore_response_error_send(c, e) }
@@ -290,6 +340,15 @@ func WitnessHasFlag(w *Witness, flag string) bool {
 	defer C.free(unsafe.Pointer(cs))
 	return bool(C.spore_witness_has_flag(w, cs))
 }
+func WitnessGetArgIds(w *Witness) []string {
+	return getStrings(func(out **C.char, n C.size_t) C.size_t { return C.spore_witness_get_arg_ids(w, out, n) })
+}
+func WitnessGetFlags(w *Witness) []string {
+	return getStrings(func(out **C.char, n C.size_t) C.size_t { return C.spore_witness_get_flags(w, out, n) })
+}
+func WitnessGetRaw(w *Witness) string {
+	return getRaw(func(n *C.size_t) *C.char { return C.spore_witness_get_raw(w, n) })
+}
 
 // send/serialize
 func WitnessSend(c *Client, w *Witness)      { C.spore_witness_send(c, w) }
@@ -339,6 +398,15 @@ func PublishHasFlag(p *Publish, flag string) bool {
 	cs := C.CString(flag)
 	defer C.free(unsafe.Pointer(cs))
 	return bool(C.spore_publish_has_flag(p, cs))
+}
+func PublishGetArgIds(p *Publish) []string {
+	return getStrings(func(out **C.char, n C.size_t) C.size_t { return C.spore_publish_get_arg_ids(p, out, n) })
+}
+func PublishGetFlags(p *Publish) []string {
+	return getStrings(func(out **C.char, n C.size_t) C.size_t { return C.spore_publish_get_flags(p, out, n) })
+}
+func PublishGetRaw(p *Publish) string {
+	return getRaw(func(n *C.size_t) *C.char { return C.spore_publish_get_raw(p, n) })
 }
 
 // send/serialize

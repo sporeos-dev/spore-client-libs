@@ -21,8 +21,8 @@ func New(command string, handle string) *Response {
 	return r
 }
 
-func FromC(h *sporec.Response) *Response { 
-	return &Response{h: h} 
+func FromC(h *sporec.Response) *Response {
+	return &Response{h: h}
 }
 
 func (r *Response) destroy() {
@@ -66,6 +66,10 @@ func (r *Response) ArgIf(key string, def string) string {
 func (r *Response) Flag(flag string) bool {
 	return sporec.ResponseHasFlag(r.h, flag)
 }
+
+func (r *Response) Args() []string  { return sporec.ResponseGetArgIds(r.h) }
+func (r *Response) Flags() []string { return sporec.ResponseGetFlags(r.h) }
+func (r *Response) Raw() string     { return sporec.ResponseGetRaw(r.h) }
 
 func (r *Response) Serialize() string {
 	sporec.ResponseSerialize(r.h)
