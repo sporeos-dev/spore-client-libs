@@ -65,6 +65,7 @@ namespace spore
         inside where = inside::NONE;
         char bracket = 0;
         size_t depth = 0;
+        bool escaped = false;
 
         //
         //
@@ -176,7 +177,27 @@ namespace spore
 
                 case inside::QUOTES:
                 {
-                    if (c == '"')
+                    if (escaped)
+                    {
+                        switch (c)
+                        {
+                            case '\\': curr.value.push_back('\\'); break;
+                            case '"': curr.value.push_back('"'); break;
+                            case 'n': curr.value.push_back('\n'); break;
+                            case 'r': curr.value.push_back('\r'); break;
+                            case 't': curr.value.push_back('\t'); break;
+                            default:
+                                curr.value.push_back('\\');
+                                curr.value.push_back(c);
+                                break;
+                        }
+                        escaped = false;
+                    }
+                    else if (c == '\\')
+                    {
+                        escaped = true;
+                    }
+                    else if (c == '"')
                     {
                         where = inside::NONE;
                     }
@@ -237,9 +258,12 @@ namespace spore
                 curr.value.push_back('>');
                 break;
             case inside::NONE:
-            case inside::QUOTES:
             case inside::S_QUOTES:
                 // intentionally left blank
+                break;
+            case inside::QUOTES:
+                if (escaped)
+                    curr.value.push_back('\\');
                 break;
         }
 
