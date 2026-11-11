@@ -56,6 +56,7 @@ namespace spore
         std::string raw;
         mutable std::string serialized;
 
+        static std::string quote(std::string_view value);
         void serializeArg(std::string& s, const std::string& k, const std::string& v) const;
     };
 
