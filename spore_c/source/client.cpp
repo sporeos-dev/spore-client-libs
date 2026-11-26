@@ -398,6 +398,11 @@ namespace spore
             writeRaw(wire, std::strlen(wire));
     }
 
+    void Client::setReadyHandler(spore_ready_fn fn)
+    {
+        readyFn = fn;
+    }
+
     void Client::listen()
     {
         errorCode.clear();
@@ -407,6 +412,18 @@ namespace spore
             error("NotConnected", "client is not connected");
             return;
         }
+
+        readyThread = std::thread([this] {
+            if (readyFn && !readyFn(self))
+            {
+                spore_witness_t w;
+                w.witness.setBody("ready handler failed, READY not sent");
+                w.witness.serialize();
+                writeRaw(w.witness.getSerialized(), std::strlen(w.witness.getSerialized()));
+                return;
+            }
+            writeRaw("READY", 5);
+        });
 
         std::string buf;
         buf.reserve(4096);
@@ -527,6 +544,20 @@ namespace spore
                     }
                     case SPORE_PARSER_TYPE_RESPONSE:
                     {
+                        {
+                            const char* handle = spore_message_get_handle(msg);
+                            std::lock_guard<std::mutex> lk(waitMu);
+                            auto it = waiters.find(handle ? handle : "");
+                            if (it != waiters.end())
+                            {
+                                it->second->raw = rawLine;
+                                it->second->done = true;
+                                it->second->cv.notify_one();
+                                waiters.erase(it);
+                                break;
+                            }
+                        }
+
                         // Determine ok vs error by checking flags
                         size_t nf = 0;
                         const char** flags = spore_message_get_flags(msg, &nf);
@@ -621,6 +652,35 @@ namespace spore
 
         spore_message_destroy(msg);
         spore_parser_destroy(parser);
+        readyThread.join();
+    }
+
+    bool Client::sendAndWait(const spore_request_t* hRequest, int timeoutMs)
+    {
+        hRequest->request.setResponse("");
+        Waiter w;
+        std::string handle(hRequest->request.getHandle());
+        {
+            std::lock_guard<std::mutex> lk(waitMu);
+            waiters[handle] = &w;
+        }
+
+        send(hRequest);
+        std::unique_lock<std::mutex> lk(waitMu);
+        if (hasError())
+        {
+            waiters.erase(handle);
+            return false;
+        }
+
+        if (!w.cv.wait_for(lk, std::chrono::milliseconds(timeoutMs), [&] { return w.done; }))
+        {
+            waiters.erase(handle);
+            return false;
+        }
+
+        hRequest->request.setResponse(std::move(w.raw));
+        return true;
     }
 
     void Client::sendRaw(const char* data, size_t len)

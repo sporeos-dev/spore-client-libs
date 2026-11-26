@@ -21,6 +21,23 @@ func New(command string, handle string) *Response {
 	return r
 }
 
+// Parse builds a response from a raw line. Exactly one of the results is non-nil.
+func Parse(raw string) (*Response, *ResponseError) {
+	r := &Response{h: sporec.ResponseCreateFromRaw(raw)}
+	if r.h != nil && !r.Flag("error") {
+		runtime.SetFinalizer(r, (*Response).destroy)
+		return r, nil
+	}
+	r.destroy()
+
+	re := &ResponseError{h: sporec.ResponseErrorCreateFromRaw(raw)}
+	if re.h == nil {
+		return nil, nil
+	}
+	runtime.SetFinalizer(re, (*ResponseError).destroy)
+	return nil, re
+}
+
 func FromC(h *sporec.Response) *Response {
 	return &Response{h: h}
 }

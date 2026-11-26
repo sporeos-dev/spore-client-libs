@@ -197,11 +197,27 @@ void spore_client_unregister_handler(spore_client_t* hClient, spore_handler_t* h
     hClient->client.unregisterHandler(hHandler);
 }
 
+void spore_client_set_ready_handler(spore_client_t* hClient, spore_ready_fn fn)
+{
+    if (!hClient)
+        return;
+    hClient->client.setReadyHandler(fn);
+}
+
 void spore_client_listen(spore_client_t* hClient)
 {
     if (!hClient)
         return;
     hClient->client.listen();
+}
+
+bool spore_client_send_and_wait(spore_client_t* hClient,
+                                const spore_request_t* hRequest,
+                                int timeoutMs)
+{
+    if (!hClient || !hRequest)
+        return false;
+    return hClient->client.sendAndWait(hRequest, timeoutMs);
 }
 
 void spore_client_send_raw(spore_client_t* hClient, const char* pData, size_t sz)
@@ -317,6 +333,13 @@ const char* spore_request_get_serialized(const spore_request_t* hRequest)
     if (!hRequest)
         return nullptr;
     return hRequest->request.getSerialized();
+}
+
+const char* spore_request_get_response(const spore_request_t* hRequest)
+{
+    if (!hRequest)
+        return nullptr;
+    return hRequest->request.getResponse();
 }
 
 // ============================================================

@@ -14,6 +14,8 @@ import (
 	"github.com/sporeos-dev/spore-client-libs/spore_go/witness"
 )
 
+const sendAndWaitTimeoutMs = 5000
+
 type Client struct {
 	nodeid string
 	h *sporec.Client
@@ -32,6 +34,17 @@ func New(nodeid string) *Client {
 		return nil
 	}
 	runtime.SetFinalizer(c, (*Client).destroy)
+	return c
+}
+
+// WithReady sets the function that runs after the handshake, before the hub forwards any
+// request to this node. It runs on its own thread once Listen starts, so it can use
+// SendRequestAndWait. Returning an error means READY is not sent; send your own witness
+// first if you want the reason in the logs.
+func (c *Client) WithReady(fn func(*Client) error) *Client {
+	sporec.ClientSetReady(c.h, func(_ *sporec.Client) bool {
+		return fn(c) == nil
+	})
 	return c
 }
 
@@ -88,6 +101,23 @@ func (c *Client) SendRaw(raw string) error {
 func (c *Client) SendRequest(r *request.Request) error {
 	sporec.RequestSend(c.h, r.H())
 	return c.error()
+}
+
+// SendRequestAndWait blocks until the response arrives. Needs Listen() running in
+// another goroutine, so it can't be called from a handler. The error is for a timeout
+// or send failure; a hub error comes back as the *ResponseError.
+func (c *Client) SendRequestAndWait(r *request.Request) (*response.Response, *response.ResponseError, error) {
+	if !sporec.ClientSendAndWait(c.h, r.H(), sendAndWaitTimeoutMs) {
+		if err := c.error(); err != nil {
+			return nil, nil, err
+		}
+		return nil, nil, fmt.Errorf("no response to %s (handle %s)", r.Command(), r.Handle())
+	}
+	ok, rerr := response.Parse(sporec.RequestGetResponse(r.H()))
+	if ok == nil && rerr == nil {
+		return nil, nil, fmt.Errorf("unparsable response to %s", r.Command())
+	}
+	return ok, rerr, nil
 }
 
 func (c *Client) SendResponse(r *response.Response) error {

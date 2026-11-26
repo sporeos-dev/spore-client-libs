@@ -21,3 +21,6 @@ spore_handler_t* registerPublishHandler(spore_client_t* c) {
 spore_handler_t* registerParseErrorHandler(spore_client_t* c) {
     return spore_client_register_parse_error_handler(c, (spore_parse_error_fn)goParseErrorBridge);
 }
+void setReadyHandler(spore_client_t* c) {
+    spore_client_set_ready_handler(c, (spore_ready_fn)goReadyBridge);
+}

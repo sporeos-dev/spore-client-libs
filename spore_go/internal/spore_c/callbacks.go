@@ -13,6 +13,7 @@ extern spore_handler_t* registerResponseHandler(spore_client_t* c);
 extern spore_handler_t* registerWitnessHandler(spore_client_t* c);
 extern spore_handler_t* registerPublishHandler(spore_client_t* c);
 extern spore_handler_t* registerParseErrorHandler(spore_client_t* c);
+extern void setReadyHandler(spore_client_t* c);
 */
 import "C"
 import (
@@ -25,7 +26,7 @@ type ResponseHandler func(c *Client, r *Response, e *ResponseError)
 type WitnessHandler func(c *Client, w *Witness)
 type PublishHandler func(c *Client, p *Publish)
 type ParseErrorHandler func(c *Client, code, what, raw string)
-
+type ReadyHandler func(c *Client) bool
 type handlerType uint8
 
 const (
@@ -51,6 +52,7 @@ var (
 	witnessHandlers    = make(map[uintptr]map[uint64]WitnessHandler)
 	publishHandlers    = make(map[uintptr]map[uint64]PublishHandler)
 	parseErrorHandlers = make(map[uintptr]map[uint64]ParseErrorHandler)
+	readyHandlers      = make(map[uintptr]ReadyHandler)
 
 	requestBridges    = make(map[uintptr]*C.spore_handler_t)
 	responseBridges   = make(map[uintptr]*C.spore_handler_t)
@@ -183,6 +185,24 @@ func ClientOnPublish(c *Client, fn PublishHandler) *Handler {
 	return &Handler{client: c, type_: publishHandlerType, id: id}
 }
 
+//export goReadyBridge
+func goReadyBridge(c *C.spore_client_t) C.bool {
+	handlersMu.Lock()
+	fn := readyHandlers[key(c)]
+	handlersMu.Unlock()
+	if fn == nil {
+		return true
+	}
+	return C.bool(fn(c))
+}
+
+func ClientSetReady(c *Client, fn ReadyHandler) {
+	handlersMu.Lock()
+	defer handlersMu.Unlock()
+	readyHandlers[key(c)] = fn
+	C.setReadyHandler(c)
+}
+
 func ClientOnParseError(c *Client, fn ParseErrorHandler) *Handler {
 	handlersMu.Lock()
 	defer handlersMu.Unlock()
@@ -273,6 +293,7 @@ func clearClientHandlers(c *Client) {
 	delete(witnessHandlers, clientKey)
 	delete(publishHandlers, clientKey)
 	delete(parseErrorHandlers, clientKey)
+	delete(readyHandlers, clientKey)
 	delete(requestBridges, clientKey)
 	delete(responseBridges, clientKey)
 	delete(witnessBridges, clientKey)

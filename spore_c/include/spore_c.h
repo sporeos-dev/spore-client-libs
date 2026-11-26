@@ -39,6 +39,10 @@ extern "C"
                                          const char* pWhat,
                                          const char* pRaw);
 
+    // runs once after the handshake, on its own thread, so it may use spore_client_send_and_wait.
+    // Return true when setup succeeded and the client should announce READY.
+    typedef bool (*spore_ready_fn)(spore_client_t* hClient);
+
     //
     //
     // client
@@ -68,8 +72,21 @@ extern "C"
                                                                spore_parse_error_fn fn);
     void spore_client_unregister_handler(spore_client_t* hClient, spore_handler_t* hHandler);
 
-    // main event loop
+    // Only one ready function is kept; setting another replaces it. Set it before listen.
+    void spore_client_set_ready_handler(spore_client_t* hClient, spore_ready_fn fn);
+
+    // main event loop. Starts the ready thread, which sends READY once the ready function
+    // returns true (or right away when there is none), then reads until disconnect.
     void spore_client_listen(spore_client_t* hClient);
+
+    // Sends hRequest and blocks until the response with the same handle arrives. Returns false
+    // on timeout or send failure. The raw response line is then available from
+    // spore_request_get_response; parse it with spore_response_create_from_raw (or the _error_
+    // variant when it has the error flag). Needs spore_client_listen running on another thread,
+    // so do not call it from a handler. hRequest must have a handle.
+    bool spore_client_send_and_wait(spore_client_t* hClient,
+                                    const spore_request_t* hRequest,
+                                    int timeoutMs);
 
     // raw wire send
     void spore_client_send_raw(spore_client_t* hClient, const char* pData, size_t sz);
@@ -109,6 +126,9 @@ extern "C"
     // serialize
     void spore_request_serialize(spore_request_t* hRequest);
     const char* spore_request_get_serialized(const spore_request_t* hRequest);
+
+    // raw response line stored by spore_client_send_and_wait; null if there is none
+    const char* spore_request_get_response(const spore_request_t* hRequest);
 
     //
     //

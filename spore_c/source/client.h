@@ -6,9 +6,12 @@
 #pragma once
 
 #include "spore_c.h"
+#include <atomic>
+#include <condition_variable>
 #include <mutex>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 #include <map>
 
@@ -50,7 +53,11 @@ namespace spore
         void sendWitness(const spore_witness_t* hWitness);
         void sendPublish(const spore_publish_t* hPublish);
 
+        void setReadyHandler(spore_ready_fn fn);
+
         void listen();
+        // needs listen() running on another thread, so not callable from a handler
+        bool sendAndWait(const spore_request_t* hRequest, int timeoutMs = 5000);
         void sendRaw(const char* data, size_t len);
 
         spore_client_t* self = nullptr;  // back-pointer set by spore_client_create
@@ -63,12 +70,24 @@ namespace spore
 
         std::string nodeId;
         socket_t socketFd = kInvalidSocket;
-        bool connected = false;
+        std::atomic<bool> connected{ false };
         int nextId = 0;
         std::string errorCode;
         std::string errorWhat;
 
         std::mutex writeMu;
+
+        spore_ready_fn readyFn = nullptr;
+        std::thread readyThread;
+
+        struct Waiter
+        {
+            std::condition_variable cv;
+            std::string raw;
+            bool done = false;
+        };
+        std::mutex waitMu;
+        std::map<std::string, Waiter*> waiters;  // handle -> waiter
 
         std::vector<spore_handler_t*> requestHandlers;
         std::vector<spore_handler_t*> responseHandlers;

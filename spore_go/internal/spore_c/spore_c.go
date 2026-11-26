@@ -73,6 +73,9 @@ func ClientGetErrorWhat(c *Client) string { return C.GoString(C.spore_client_get
 
 // send/receive
 func ClientListen(c *Client) { C.spore_client_listen(c) }
+func ClientSendAndWait(c *Client, r *Request, timeoutMs int) bool {
+	return bool(C.spore_client_send_and_wait(c, r, C.int(timeoutMs)))
+}
 func ClientSendRaw(c *Client, data string) {
 	cs := C.CString(data)
 	defer C.free(unsafe.Pointer(cs))
@@ -143,6 +146,7 @@ func RequestGetRaw(r *Request) string {
 func RequestSend(c *Client, r *Request)      { C.spore_request_send(c, r) }
 func RequestSerialize(r *Request)            { C.spore_request_serialize(r) }
 func RequestGetSerialized(r *Request) string { return C.GoString(C.spore_request_get_serialized(r)) }
+func RequestGetResponse(r *Request) string   { return C.GoString(C.spore_request_get_response(r)) }
 
 //
 //
