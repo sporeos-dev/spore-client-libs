@@ -17,6 +17,16 @@ namespace spore
         return handle;
     }
 
+    std::string_view message::getStreamField() const
+    {
+        return streamField;
+    }
+
+    std::string_view message::getStreamText() const
+    {
+        return streamText;
+    }
+
     std::vector<spore_arg_t>& message::getArgs()
     {
         argsC.clear();
@@ -39,6 +49,16 @@ namespace spore
     void message::setHandle(std::string_view h)
     {
         handle = h;
+    }
+
+    void message::setStreamField(std::string_view field)
+    {
+        streamField = field;
+    }
+
+    void message::setStreamText(std::string_view text)
+    {
+        streamText = text;
     }
 
     void message::addArg(std::string_view key, std::string_view value)

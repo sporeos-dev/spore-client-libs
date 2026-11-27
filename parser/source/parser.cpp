@@ -46,8 +46,12 @@ namespace spore
         errorCode.clear();
         errorWhat.clear();
         props = props_t{};
+        type = SPORE_PARSER_TYPE_UNKNOWN;
 
         if (!hMessage)
+            return;
+
+        if (parseStreamChunk(message, hMessage))
             return;
 
         std::vector<token_t> tokens;
@@ -57,6 +61,56 @@ namespace spore
 
         // build
         build(hMessage, tokens);
+    }
+
+    bool parser::parseStreamChunk(std::string_view line, spore_message_t* hMessage)
+    {
+        if (line.empty() || line.front() != '~')
+            return false;
+        const auto marker = line.find("<<");
+        const auto space = line.find(' ');
+        if (marker == std::string_view::npos ||
+            (space != std::string_view::npos && marker > space))
+            return false;
+
+        type = SPORE_PARSER_TYPE_STREAM;
+        const auto colon = line.find(':', 1);
+        if (colon == std::string_view::npos || colon == 1 || colon + 1 >= marker ||
+            marker + 2 >= line.size() || line[marker + 2] != ' ' ||
+            line.find('\0') != std::string_view::npos)
+        {
+            props.malformedStreamChunk = true;
+            return true;
+        }
+        const auto handle = line.substr(1, colon - 1);
+        const auto field = line.substr(colon + 1, marker - colon - 1);
+        if (handle.find_first_of(" \t\r\n\v\f:<>") != std::string_view::npos ||
+            field.find_first_of(" \t\r\n\v\f:<>") != std::string_view::npos)
+        {
+            props.malformedStreamChunk = true;
+            return true;
+        }
+
+        std::string text;
+        const auto payload = line.substr(marker + 3);
+        for (size_t i = 0; i < payload.size(); ++i)
+        {
+            if (payload[i] == '\\' && i + 1 < payload.size())
+            {
+                switch (payload[i + 1])
+                {
+                    case '\\': text += '\\'; ++i; continue;
+                    case 'n': text += '\n'; ++i; continue;
+                    case 'r': text += '\r'; ++i; continue;
+                    case 't': text += '\t'; ++i; continue;
+                }
+            }
+            text += payload[i];
+        }
+        hMessage->message.setHandle(handle);
+        hMessage->message.setStreamField(field);
+        hMessage->message.setStreamText(text);
+        return true;
     }
 
     void parser::tokenize(std::string_view message, std::vector<token_t>& tokens)
@@ -351,6 +405,13 @@ namespace spore
 
         switch (type)
         {
+            case SPORE_PARSER_TYPE_STREAM:
+            {
+                if (props.malformedStreamChunk)
+                    error("Malformed", "invalid stream chunk");
+            }
+            break;
+
             case SPORE_PARSER_TYPE_REQUEST:
             {
                 if (hMessage->message.getCapability().empty())

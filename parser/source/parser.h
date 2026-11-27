@@ -22,6 +22,7 @@ namespace spore
             bool hasArgCode = false;
             bool hasArgWhat = false;
             bool hasArgBody = false;
+            bool malformedStreamChunk = false;
         };
 
     private:
@@ -32,6 +33,7 @@ namespace spore
         props_t props;
 
         void error(std::string_view code, std::string_view what);
+        bool parseStreamChunk(std::string_view message, spore_message_t* hMessage);
 
     public:
         parser() = default;

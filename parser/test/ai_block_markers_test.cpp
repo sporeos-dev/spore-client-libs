@@ -5,8 +5,7 @@
 #include "parser.h"
 #include "spore_parser.h"
 
-// << and >> have no special meaning to the parser: multi-line values are quoted with \n / \r
-// escapes, and streamed fields are framed by the client and assembled by the hub.
+// Markers in ordinary tokens and quoted values remain literal.
 
 class BlockMarkers
     : public Fixture

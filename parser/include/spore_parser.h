@@ -20,7 +20,8 @@ extern "C"
         SPORE_PARSER_TYPE_REQUEST,
         SPORE_PARSER_TYPE_RESPONSE,
         SPORE_PARSER_TYPE_WITNESS,
-        SPORE_PARSER_TYPE_PUBLISH
+        SPORE_PARSER_TYPE_PUBLISH,
+        SPORE_PARSER_TYPE_STREAM,
     } spore_parser_type_t;
 
     typedef struct spore_parser_t spore_parser_t;
@@ -45,6 +46,8 @@ extern "C"
     void spore_message_destroy(spore_message_t* hMessage);
     const char* spore_message_get_capability(spore_message_t* hMessage);
     const char* spore_message_get_handle(spore_message_t* hMessage);
+    const char* spore_message_get_stream_field(spore_message_t* hMessage);
+    const char* spore_message_get_stream_text(spore_message_t* hMessage, size_t* pSize);
     const spore_arg_t* spore_message_get_args(spore_message_t* hMessage, size_t* pNum);
     const char** spore_message_get_flags(spore_message_t* hMessage, size_t* pNum);
 

@@ -94,6 +94,22 @@ const char* spore_message_get_handle(spore_message_t* hMessage)
     return hMessage->message.getHandle().data();
 }
 
+const char* spore_message_get_stream_field(spore_message_t* hMessage)
+{
+    if (!hMessage || hMessage->message.getStreamField().empty())
+        return nullptr;
+    return hMessage->message.getStreamField().data();
+}
+
+const char* spore_message_get_stream_text(spore_message_t* hMessage, size_t* pSize)
+{
+    if (!hMessage || !pSize)
+        return nullptr;
+    const auto text = hMessage->message.getStreamText();
+    *pSize = text.size();
+    return text.data();
+}
+
 const spore_arg_t* spore_message_get_args(spore_message_t* hMessage, size_t* pNum)
 {
     if (!hMessage || !pNum)
