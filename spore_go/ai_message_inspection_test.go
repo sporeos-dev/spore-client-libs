@@ -103,16 +103,16 @@ func TestMessageInspection(t *testing.T) {
 	}
 }
 
-func TestRawPreservesMultilineInputAfterMutation(t *testing.T) {
-	raw := "Example.run ~h text=<<\r\nhello world\r\n>> flag\r\n"
+func TestRawPreservesQuotedLineBreaksAfterMutation(t *testing.T) {
+	raw := "Example.run ~h text=\"hello\\r\\nworld\" flag\r\n"
 	h := sporec.RequestCreateFromRaw(raw)
 	if h == nil {
-		t.Fatal("failed to parse multiline request")
+		t.Fatal("failed to parse request with escaped line breaks")
 	}
 
 	defer sporec.RequestDestroy(h)
 	msg := request.FromC(h)
-	if value, ok := msg.Arg("text"); !ok || value != "hello world" {
+	if value, ok := msg.Arg("text"); !ok || value != "hello\r\nworld" {
 		t.Errorf("Arg(text) = %q, %v", value, ok)
 	}
 	if got := msg.Flags(); !reflect.DeepEqual(got, []string{"flag"}) {

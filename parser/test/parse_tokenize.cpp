@@ -1,7 +1,6 @@
 // Copyright 2026 Matt Harrison
 // SPDX-License-Identifier: Apache-2.0
 
-
 #include "fixture.h"
 #include "parser.h"
 
@@ -138,28 +137,6 @@ TEST_F(Tokenize, parentheses_are_ordinary_characters)
     EXPECT_EQ(tokens[2].type, token_t::type_t::ARG);
     EXPECT_STREQ(tokens[2].value.c_str(), "body=(value)");
     EXPECT_FALSE(hasError());
-}
-
-TEST_F(Tokenize, triangles)
-{
-    tokenize("Some ~h body=<<some message>> flag", tokens);
-    EXPECT_EQ(tokens.size(), 4);
-    EXPECT_EQ(tokens[0].type, token_t::type_t::NONE);
-    EXPECT_EQ(tokens[1].type, token_t::type_t::HANDLE);
-    EXPECT_EQ(tokens[2].type, token_t::type_t::ARG);
-    EXPECT_EQ(tokens[3].type, token_t::type_t::NONE);
-    EXPECT_STREQ(tokens[2].value.c_str(), "body=<<some message>>");
-}
-
-TEST_F(Tokenize, triangles_with_newlines)
-{
-    tokenize("Some ~h body=<<\nline0\nline1\nline2\n>> flag", tokens);
-    EXPECT_EQ(tokens.size(), 4);
-    EXPECT_EQ(tokens[0].type, token_t::type_t::NONE);
-    EXPECT_EQ(tokens[1].type, token_t::type_t::HANDLE);
-    EXPECT_EQ(tokens[2].type, token_t::type_t::ARG);
-    EXPECT_EQ(tokens[3].type, token_t::type_t::NONE);
-    EXPECT_STREQ(tokens[2].value.c_str(), "body=<<\nline0\nline1\nline2\n>>");
 }
 
 TEST_F(Tokenize, left_open)

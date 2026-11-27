@@ -91,8 +91,7 @@ namespace spore
                             if (!curr.value.empty())
                             {
                                 tokens.push_back(std::move(curr));
-                                curr.value.clear();
-                                curr.type = token_t::type_t::NONE;
+                                curr = {};
                             }
                         }
                         break;
@@ -127,19 +126,6 @@ namespace spore
                             {
                                 curr.value.push_back(c);
                                 curr.type = token_t::type_t::HANDLE;
-                            }
-                            else
-                            {
-                                curr.value.push_back(c);
-                            }
-                        }
-                        break;
-                        case '<':
-                        {
-                            if (message.size() > next && message[next] == '<')
-                            {
-                                curr.value.push_back(c);
-                                where = inside::TRIANGLES;
                             }
                             else
                             {
@@ -227,23 +213,6 @@ namespace spore
                     }
                 }
                 break;
-
-                    // inside
-                    // triangles
-
-                case inside::TRIANGLES:
-                {
-                    if (c == '>' && message.size() > next && message[next] == '>')
-                    {
-                        curr.value.push_back(c);
-                        where = inside::NONE;
-                    }
-                    else
-                    {
-                        curr.value.push_back(c);
-                    }
-                }
-                break;
             }
         }
 
@@ -252,10 +221,6 @@ namespace spore
         {
             case inside::BRACKETS:
                 for (size_t i = 0; i < depth; ++i) curr.value.push_back(bracket == '[' ? ']' : '}');
-                break;
-            case inside::TRIANGLES:
-                curr.value.push_back('>');
-                curr.value.push_back('>');
                 break;
             case inside::NONE:
             case inside::S_QUOTES:
@@ -341,17 +306,6 @@ namespace spore
                             auto pos = t.value.find('=');
                             std::string key = t.value.substr(0, pos);
                             std::string value = t.value.substr(pos + 1);
-
-                            // strip block delimiters and trim one boundary newline on each side
-                            if (value.size() >= 4 && value[0] == '<' && value[1] == '<' &&
-                                value[value.size() - 2] == '>' && value[value.size() - 1] == '>')
-                            {
-                                value = value.substr(2, value.size() - 4);
-                                if (!value.empty() && value.front() == '\n')
-                                    value.erase(0, 1);
-                                if (!value.empty() && value.back() == '\n')
-                                    value.pop_back();
-                            }
 
                             if (key == "code")
                                 props.hasArgCode = true;

@@ -65,11 +65,7 @@ namespace spore
 
     void Message::serializeArg(std::string& s, const std::string& k, const std::string& v) const
     {
-        if (v.find('\n') != std::string::npos)
-        {
-            s += " " + k + "=<<\n" + v + "\n>>";
-        }
-        else if (v.find_first_of(" \t\r\"'\\") != std::string::npos)
+        if (v.find_first_of(" \t\r\n\"'\\<>") != std::string::npos)
         {
             s += " " + k + "=" + quote(v);
         }

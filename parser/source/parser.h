@@ -65,7 +65,6 @@ namespace spore
             QUOTES,
             S_QUOTES,
             BRACKETS,
-            TRIANGLES,
         };
 
         void tokenize(std::string_view message, std::vector<token_t>& tokens);

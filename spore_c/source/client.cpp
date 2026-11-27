@@ -5,6 +5,7 @@
 #include "spore_parser.h"
 #include <algorithm>
 #include <chrono>
+#include <climits>
 #include <cstring>
 #include <string>
 #include <iostream>
@@ -288,13 +289,20 @@ namespace spore
     void Client::writeRaw(const char* data, size_t len)
     {
         std::lock_guard<std::mutex> lk(writeMu);
-        if (SPORE_WRITE(socketFd, data, static_cast<int>(len)) < 0)
+        const bool needsNewline = len == 0 || data[len - 1] != '\n';
+        while (len > 0)
         {
-            error("SendFailed", "failed to write to socket");
-            return;
+            const auto count = static_cast<int>((std::min)(len, static_cast<size_t>(INT_MAX)));
+            auto n = SPORE_WRITE(socketFd, data, count);
+            if (n <= 0)
+            {
+                error("SendFailed", "failed to write to socket");
+                return;
+            }
+            data += n;
+            len -= n;
         }
-        // hub uses ReadString('\n') so every message must end with a newline
-        if (SPORE_WRITE(socketFd, "\n", 1) < 0)
+        if (needsNewline && SPORE_WRITE(socketFd, "\n", 1) != 1)
             error("SendFailed", "failed to write newline terminator");
     }
 
@@ -428,9 +436,6 @@ namespace spore
         std::string buf;
         buf.reserve(4096);
         char tmp[1024];
-        std::string line;
-        std::string rawLine;
-        bool multiline = false;
 
         spore_parser_t* parser = nullptr;
         spore_message_t* msg = nullptr;
@@ -446,54 +451,16 @@ namespace spore
             std::string::size_type pos;
             while ((pos = buf.find('\n')) != std::string::npos)
             {
-                std::string currentLine = buf.substr(0, pos);
-                rawLine.append(buf, 0, pos + 1);
+                std::string rawLine = buf.substr(0, pos + 1);
+                std::string line = buf.substr(0, pos);
                 buf.erase(0, pos + 1);
 
                 // strip \r for Windows line endings
-                if (!currentLine.empty() && currentLine.back() == '\r')
-                    currentLine.pop_back();
+                if (!line.empty() && line.back() == '\r')
+                    line.pop_back();
 
-                if (!multiline)
-                {
-                    auto openPos = currentLine.find("<<");
-                    // only enter multiline mode if this line's block isn't
-                    // already closed by a ">>" later on the same line
-                    bool selfClosed = openPos != std::string::npos &&
-                                      currentLine.find(">>", openPos + 2) != std::string::npos;
-                    if (openPos != std::string::npos && !selfClosed)
-                    {
-                        multiline = true;
-                        line = currentLine + "\n";
-                        continue;
-                    }
-                    else
-                    {
-                        line = currentLine;
-                    }
-                }
-                else
-                {
-                    // >> must be the first token on its line
-                    bool isClose = (currentLine == ">>" || currentLine.substr(0, 3) == ">> ");
-                    if (!isClose)
-                    {
-                        line += currentLine + "\n";
-                        continue;
-                    }
-                    line += currentLine;
-
-                    // a new block on the same >> line keeps us in multiline
-                    if (currentLine.find("<<") != std::string::npos)
-                        continue;
-                }
-
-                multiline = false;
                 if (line.empty())
-                {
-                    rawLine.clear();
                     continue;
-                }
 
                 if (parser)
                 {
@@ -517,7 +484,6 @@ namespace spore
                                         spore_parser_get_error_code(parser),
                                         spore_parser_get_error_what(parser),
                                         line.c_str());
-                    rawLine.clear();
                     continue;
                 }
 
@@ -646,7 +612,6 @@ namespace spore
                     default:
                         break;
                 }
-                rawLine.clear();
             };
         }
 
