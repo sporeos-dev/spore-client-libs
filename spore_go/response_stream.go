@@ -6,16 +6,22 @@ package spore
 import (
 	"fmt"
 	"runtime"
+	"sync"
 
 	sporec "github.com/sporeos-dev/spore-client-libs/spore_go/internal/spore_c"
 	"github.com/sporeos-dev/spore-client-libs/spore_go/request"
 )
 
-// ResponseStream sends one response field incrementally. A send failure makes
-// the stream unusable because the peer may have received a partial frame.
+// ResponseStream represents a received chunk or an open stream for sending one
+// response field. Received chunks cannot be used for sending. A send failure makes
+// an open stream unusable.
 type ResponseStream struct {
 	h      *sporec.ResponseStream
 	client *Client
+	mu     sync.Mutex
+	handle string
+	field  string
+	text   string
 }
 
 // OpenStream starts a response with one streamed field. It copies the request's
@@ -39,8 +45,45 @@ func (s *ResponseStream) destroy() {
 	sporec.StreamDestroy(s.h)
 }
 
+// Handle identifies the request associated with the stream.
+func (s *ResponseStream) Handle() string {
+	if s.h == nil {
+		return s.handle
+	}
+	handle := sporec.StreamGetHandle(s.h)
+	runtime.KeepAlive(s)
+	return handle
+}
+
+// Field identifies the response field being streamed.
+func (s *ResponseStream) Field() string {
+	if s.h == nil {
+		return s.field
+	}
+	field := sporec.StreamGetField(s.h)
+	runtime.KeepAlive(s)
+	return field
+}
+
+// Text returns this received chunk, or the most recently sent chunk.
+func (s *ResponseStream) Text() string {
+	if s.h == nil {
+		return s.text
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	text := sporec.StreamGetText(s.h)
+	runtime.KeepAlive(s)
+	return text
+}
+
 // Chunk sends text immediately without adding a newline.
 func (s *ResponseStream) Chunk(text string) error {
+	if s.h == nil {
+		return fmt.Errorf("cannot write to a received stream")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	err := sporec.StreamChunk(s.h, text)
 	runtime.KeepAlive(s)
 	return err
@@ -56,6 +99,9 @@ func (s *ResponseStream) Write(p []byte) (int, error) {
 
 // Close closes the field and sends a successful response.
 func (s *ResponseStream) Close() error {
+	if s.h == nil {
+		return fmt.Errorf("cannot close a received stream")
+	}
 	err := sporec.StreamClose(s.h)
 	runtime.KeepAlive(s)
 	return err
@@ -65,6 +111,9 @@ func (s *ResponseStream) Close() error {
 // Code and what must be nonempty; what must not contain NUL.
 // A nil return means the error response was sent, not that the operation succeeded.
 func (s *ResponseStream) Fail(code, what string) error {
+	if s.h == nil {
+		return fmt.Errorf("cannot fail a received stream")
+	}
 	err := sporec.StreamFail(s.h, code, what)
 	runtime.KeepAlive(s)
 	return err

@@ -10,6 +10,7 @@ package sporec
 // defined in bridges.c
 extern spore_handler_t* registerRequestHandler(spore_client_t* c);
 extern spore_handler_t* registerResponseHandler(spore_client_t* c);
+extern spore_handler_t* registerStreamHandler(spore_client_t* c);
 extern spore_handler_t* registerWitnessHandler(spore_client_t* c);
 extern spore_handler_t* registerPublishHandler(spore_client_t* c);
 extern spore_handler_t* registerParseErrorHandler(spore_client_t* c);
@@ -23,6 +24,7 @@ import (
 
 type RequestHandler func(c *Client, r *Request)
 type ResponseHandler func(c *Client, r *Response, e *ResponseError)
+type StreamHandler func(c *Client, handle, field, text string)
 type WitnessHandler func(c *Client, w *Witness)
 type PublishHandler func(c *Client, p *Publish)
 type ParseErrorHandler func(c *Client, code, what, raw string)
@@ -32,6 +34,7 @@ type handlerType uint8
 const (
 	requestHandlerType handlerType = iota
 	responseHandlerType
+	streamHandlerType
 	witnessHandlerType
 	publishHandlerType
 	parseErrorHandlerType
@@ -49,6 +52,7 @@ var (
 
 	requestHandlers    = make(map[uintptr]map[uint64]RequestHandler)
 	responseHandlers   = make(map[uintptr]map[uint64]ResponseHandler)
+	streamHandlers     = make(map[uintptr]map[uint64]StreamHandler)
 	witnessHandlers    = make(map[uintptr]map[uint64]WitnessHandler)
 	publishHandlers    = make(map[uintptr]map[uint64]PublishHandler)
 	parseErrorHandlers = make(map[uintptr]map[uint64]ParseErrorHandler)
@@ -56,6 +60,7 @@ var (
 
 	requestBridges    = make(map[uintptr]*C.spore_handler_t)
 	responseBridges   = make(map[uintptr]*C.spore_handler_t)
+	streamBridges     = make(map[uintptr]*C.spore_handler_t)
 	witnessBridges    = make(map[uintptr]*C.spore_handler_t)
 	publishBridges    = make(map[uintptr]*C.spore_handler_t)
 	parseErrorBridges = make(map[uintptr]*C.spore_handler_t)
@@ -91,6 +96,26 @@ func goResponseBridge(c *C.spore_client_t, r *C.spore_response_t, e *C.spore_res
 	handlersMu.Unlock()
 	for _, fn := range handlers {
 		fn(c, r, e)
+	}
+}
+
+//export goStreamBridge
+func goStreamBridge(c *C.spore_client_t, stream *C.spore_stream_t) {
+	handle := C.GoString(C.spore_stream_get_handle(stream))
+	field := C.GoString(C.spore_stream_get_field(stream))
+	text := getRaw(func(size *C.size_t) *C.char { return C.spore_stream_get_text(stream, size) })
+	dispatchStream(c, handle, field, text)
+}
+
+func dispatchStream(c *Client, handle, field, text string) {
+	handlersMu.Lock()
+	handlers := make([]StreamHandler, 0, len(streamHandlers[key(c)]))
+	for _, fn := range streamHandlers[key(c)] {
+		handlers = append(handlers, fn)
+	}
+	handlersMu.Unlock()
+	for _, fn := range handlers {
+		fn(c, handle, field, text)
 	}
 }
 
@@ -157,6 +182,26 @@ func ClientOnResponse(c *Client, fn ResponseHandler) *Handler {
 	id := nextID()
 	responseHandlers[clientKey][id] = fn
 	return &Handler{client: c, type_: responseHandlerType, id: id}
+}
+
+func ClientOnStream(c *Client, fn StreamHandler) *Handler {
+	if c == nil || fn == nil {
+		return nil
+	}
+	handlersMu.Lock()
+	defer handlersMu.Unlock()
+	clientKey := key(c)
+	if streamHandlers[clientKey] == nil {
+		bridge := C.registerStreamHandler(c)
+		if bridge == nil {
+			return nil
+		}
+		streamHandlers[clientKey] = make(map[uint64]StreamHandler)
+		streamBridges[clientKey] = bridge
+	}
+	id := nextID()
+	streamHandlers[clientKey][id] = fn
+	return &Handler{client: c, type_: streamHandlerType, id: id}
 }
 
 func ClientOnWitness(c *Client, fn WitnessHandler) *Handler {
@@ -247,6 +292,17 @@ func ClientOffHandler(c *Client, h *Handler) {
 			delete(responseHandlers, clientKey)
 			delete(responseBridges, clientKey)
 		}
+	case streamHandlerType:
+		handlers, ok := streamHandlers[clientKey]
+		if !ok {
+			break
+		}
+		delete(handlers, h.id)
+		if len(handlers) == 0 {
+			C.spore_client_unregister_handler(c, streamBridges[clientKey])
+			delete(streamHandlers, clientKey)
+			delete(streamBridges, clientKey)
+		}
 	case witnessHandlerType:
 		handlers, ok := witnessHandlers[clientKey]
 		if !ok {
@@ -290,12 +346,14 @@ func clearClientHandlers(c *Client) {
 	clientKey := key(c)
 	delete(requestHandlers, clientKey)
 	delete(responseHandlers, clientKey)
+	delete(streamHandlers, clientKey)
 	delete(witnessHandlers, clientKey)
 	delete(publishHandlers, clientKey)
 	delete(parseErrorHandlers, clientKey)
 	delete(readyHandlers, clientKey)
 	delete(requestBridges, clientKey)
 	delete(responseBridges, clientKey)
+	delete(streamBridges, clientKey)
 	delete(witnessBridges, clientKey)
 	delete(publishBridges, clientKey)
 	delete(parseErrorBridges, clientKey)

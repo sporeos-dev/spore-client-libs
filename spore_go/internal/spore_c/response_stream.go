@@ -17,6 +17,18 @@ import (
 
 type ResponseStream = C.spore_stream_t
 
+func StreamGetHandle(stream *ResponseStream) string {
+	return C.GoString(C.spore_stream_get_handle(stream))
+}
+
+func StreamGetField(stream *ResponseStream) string {
+	return C.GoString(C.spore_stream_get_field(stream))
+}
+
+func StreamGetText(stream *ResponseStream) string {
+	return getRaw(func(size *C.size_t) *C.char { return C.spore_stream_get_text(stream, size) })
+}
+
 func streamResult(result C.spore_stream_result_t) error {
 	switch result {
 	case C.SPORE_STREAM_OK:
