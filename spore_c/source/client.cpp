@@ -22,7 +22,11 @@
     #include <sys/un.h>
     #include <unistd.h>
     #define SPORE_CLOSE(fd) ::close(fd)
-    #define SPORE_WRITE(fd, buf, len) ::write(fd, buf, len)
+    #if defined(MSG_NOSIGNAL)
+        #define SPORE_WRITE(fd, buf, len) ::send(fd, buf, len, MSG_NOSIGNAL)
+    #else
+        #define SPORE_WRITE(fd, buf, len) ::write(fd, buf, len)
+    #endif
     #define SPORE_READ(fd, buf, len) ::read(fd, buf, len)
 #endif
 
@@ -187,6 +191,7 @@ namespace spore
     {
         errorCode.clear();
         errorWhat.clear();
+        std::lock_guard<std::mutex> lk(writeMu);
         if (!connected && socketFd == kInvalidSocket)
             return;
         if (socketFd != kInvalidSocket)
@@ -288,22 +293,31 @@ namespace spore
 
     void Client::writeRaw(const char* data, size_t len)
     {
+        auto result = sendRawChecked(data, len);
+        if (result == SPORE_STREAM_NOT_CONNECTED)
+            error("NotConnected", "client is not connected");
+        else if (result != SPORE_STREAM_OK)
+            error("SendFailed", "failed to write to socket");
+    }
+
+    spore_stream_result_t Client::sendRawChecked(const char* data, size_t len)
+    {
         std::lock_guard<std::mutex> lk(writeMu);
+        if (!connected || socketFd == kInvalidSocket)
+            return SPORE_STREAM_NOT_CONNECTED;
         const bool needsNewline = len == 0 || data[len - 1] != '\n';
         while (len > 0)
         {
             const auto count = static_cast<int>((std::min)(len, static_cast<size_t>(INT_MAX)));
             auto n = SPORE_WRITE(socketFd, data, count);
             if (n <= 0)
-            {
-                error("SendFailed", "failed to write to socket");
-                return;
-            }
+                return SPORE_STREAM_SEND_FAILED;
             data += n;
             len -= n;
         }
         if (needsNewline && SPORE_WRITE(socketFd, "\n", 1) != 1)
-            error("SendFailed", "failed to write newline terminator");
+            return SPORE_STREAM_SEND_FAILED;
+        return SPORE_STREAM_OK;
     }
 
     void Client::send(const spore_request_t* hRequest)

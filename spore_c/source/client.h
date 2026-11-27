@@ -59,6 +59,7 @@ namespace spore
         // needs listen() running on another thread, so not callable from a handler
         bool sendAndWait(const spore_request_t* hRequest, int timeoutMs = 5000);
         void sendRaw(const char* data, size_t len);
+        spore_stream_result_t sendRawChecked(const char* data, size_t len);
 
         spore_client_t* self = nullptr;  // back-pointer set by spore_client_create
 

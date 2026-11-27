@@ -5,82 +5,91 @@ package spore
 
 import (
 	"fmt"
-	"strings"
-	"unicode"
+	"runtime"
+
+	sporec "github.com/sporeos-dev/spore-client-libs/spore_go/internal/spore_c"
+	"github.com/sporeos-dev/spore-client-libs/spore_go/request"
 )
+
+// ResponseStream sends one response field incrementally. A send failure makes
+// the stream unusable because the peer may have received a partial frame.
+type ResponseStream struct {
+	h      *sporec.ResponseStream
+	client *Client
+}
+
+// OpenStream starts a response with one streamed field. It copies the request's
+// handle and command, so the stream may outlive the request callback.
+func (c *Client) OpenStream(req *request.Request, field string) (*ResponseStream, error) {
+	if req == nil || req.H() == nil {
+		return nil, fmt.Errorf("stream request is nil")
+	}
+	h, err := sporec.StreamOpen(c.h, req.H(), field)
+	runtime.KeepAlive(req)
+	runtime.KeepAlive(c)
+	if err != nil {
+		return nil, err
+	}
+	s := &ResponseStream{h: h, client: c}
+	runtime.SetFinalizer(s, (*ResponseStream).destroy)
+	return s, nil
+}
+
+func (s *ResponseStream) destroy() {
+	sporec.StreamDestroy(s.h)
+}
+
+// Chunk sends text immediately without adding a newline.
+func (s *ResponseStream) Chunk(text string) error {
+	err := sporec.StreamChunk(s.h, text)
+	runtime.KeepAlive(s)
+	return err
+}
+
+// Write implements io.Writer. Streamed values are text and cannot contain NUL.
+func (s *ResponseStream) Write(p []byte) (int, error) {
+	if err := s.Chunk(string(p)); err != nil {
+		return 0, err
+	}
+	return len(p), nil
+}
+
+// Close closes the field and sends a successful response.
+func (s *ResponseStream) Close() error {
+	err := sporec.StreamClose(s.h)
+	runtime.KeepAlive(s)
+	return err
+}
+
+// Fail closes the field and sends an error response, preserving its output.
+// Code and what must be nonempty; what must not contain NUL.
+// A nil return means the error response was sent, not that the operation succeeded.
+func (s *ResponseStream) Fail(code, what string) error {
+	err := sporec.StreamFail(s.h, code, what)
+	runtime.KeepAlive(s)
+	return err
+}
 
 // SendResponseStart declares the string fields that will be streamed for a response.
 // Finish the response with SendResponse (without repeating the fields) or SendResponseError.
 func (c *Client) SendResponseStart(handle, command string, fields ...string) error {
-	frame, err := responseStartFrame(handle, command, fields)
-	if err != nil {
-		return err
-	}
-	return c.SendRaw(frame)
+	err := sporec.StreamSendStart(c.h, handle, command, fields)
+	runtime.KeepAlive(c)
+	return err
 }
 
 // SendResponseChunk immediately sends text for an open field. It does not add a
 // line break to the value; include one in text if needed.
 func (c *Client) SendResponseChunk(handle, field, text string) error {
-	frame, err := responseChunkFrame(handle, field, text)
-	if err != nil {
-		return err
-	}
-	return c.SendRaw(frame)
+	err := sporec.StreamSendChunk(c.h, handle, field, text)
+	runtime.KeepAlive(c)
+	return err
 }
 
 // SendResponseClose closes a field. Close all streamed fields before sending a
 // successful completion.
 func (c *Client) SendResponseClose(handle, field string) error {
-	frame, err := responseFieldFrame(handle, field)
-	if err != nil {
-		return err
-	}
-	return c.SendRaw(frame + ">>")
-}
-
-var responseChunkEscapes = strings.NewReplacer(`\`, `\\`, "\n", `\n`, "\r", `\r`, "\t", `\t`)
-
-func responseChunkFrame(handle, field, text string) (string, error) {
-	frame, err := responseFieldFrame(handle, field)
-	if err != nil {
-		return "", err
-	}
-	if strings.ContainsRune(text, 0) {
-		return "", fmt.Errorf("response chunk contains a NUL byte")
-	}
-	return frame + "<< " + responseChunkEscapes.Replace(text), nil
-}
-
-func responseStartFrame(handle, command string, fields []string) (string, error) {
-	frame, err := responseFieldFrame(handle, command)
-	if err != nil {
-		return "", err
-	}
-	if len(fields) == 0 {
-		return "", fmt.Errorf("streamed response needs at least one field")
-	}
-	var opening strings.Builder
-	opening.WriteString(frame)
-	seen := make(map[string]bool, len(fields))
-	for _, field := range fields {
-		if !validStreamToken(field) || seen[field] {
-			return "", fmt.Errorf("invalid or duplicate streamed field %q", field)
-		}
-		seen[field] = true
-		opening.WriteString(" " + field + "=<<")
-	}
-	return opening.String(), nil
-}
-
-func responseFieldFrame(handle, token string) (string, error) {
-	if !validStreamToken(handle) || !validStreamToken(token) {
-		return "", fmt.Errorf("invalid stream handle %q or capability/field %q", handle, token)
-	}
-	return "~" + handle + ":" + token, nil
-}
-
-func validStreamToken(token string) bool {
-	return token != "" && strings.IndexFunc(token, unicode.IsSpace) == -1 &&
-		!strings.ContainsAny(token, "\x00:<>=\"'[{")
+	err := sporec.StreamSendClose(c.h, handle, field)
+	runtime.KeepAlive(c)
+	return err
 }

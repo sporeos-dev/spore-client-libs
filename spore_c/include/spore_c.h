@@ -26,6 +26,22 @@ extern "C"
     typedef struct spore_response_error_t spore_response_error_t;
     typedef struct spore_witness_t spore_witness_t;
     typedef struct spore_publish_t spore_publish_t;
+    typedef struct spore_response_stream_t spore_response_stream_t;
+
+    typedef struct spore_string_view_t
+    {
+        const char* data;
+        size_t size;
+    } spore_string_view_t;
+
+    typedef enum spore_stream_result_t
+    {
+        SPORE_STREAM_OK,
+        SPORE_STREAM_INVALID_ARGUMENT,
+        SPORE_STREAM_NOT_CONNECTED,
+        SPORE_STREAM_SEND_FAILED,
+        SPORE_STREAM_CLOSED
+    } spore_stream_result_t;
 
     // handlers
     typedef void (*spore_request_fn)(spore_client_t* hClient, const spore_request_t* hRequest);
@@ -90,6 +106,37 @@ extern "C"
 
     // raw wire send
     void spore_client_send_raw(spore_client_t* hClient, const char* pData, size_t sz);
+
+    // Stream results belong to the individual operation, not the client's shared error state.
+    // Views may contain empty text; nonempty views require data. NUL is not allowed.
+    spore_stream_result_t spore_stream_send_start(spore_client_t* hClient,
+                                                  spore_string_view_t handle,
+                                                  spore_string_view_t command,
+                                                  const spore_string_view_t* fields,
+                                                  size_t fieldCount);
+    spore_stream_result_t spore_stream_send_chunk(spore_client_t* hClient,
+                                                  spore_string_view_t handle,
+                                                  spore_string_view_t field,
+                                                  spore_string_view_t text);
+    spore_stream_result_t spore_stream_send_close(spore_client_t* hClient,
+                                                  spore_string_view_t handle,
+                                                  spore_string_view_t field);
+
+    // Open copies the request identity and starts one streamed field. Keep the client alive
+    // until the stream is destroyed. Destroying a stream does not send a response.
+    spore_stream_result_t spore_response_stream_open(spore_client_t* hClient,
+                                                      const spore_request_t* hRequest,
+                                                      spore_string_view_t field,
+                                                      spore_response_stream_t** out);
+    spore_stream_result_t spore_response_stream_chunk(spore_response_stream_t* hStream,
+                                                       spore_string_view_t text);
+    // Close sends success; fail closes the field and sends an error with nonempty code/what.
+    spore_stream_result_t spore_response_stream_close(spore_response_stream_t* hStream);
+    spore_stream_result_t spore_response_stream_fail(spore_response_stream_t* hStream,
+                                                      spore_string_view_t code,
+                                                      spore_string_view_t what);
+    // Do not destroy a stream concurrently with an operation on it.
+    void spore_response_stream_destroy(spore_response_stream_t* hStream);
 
     //
     //
