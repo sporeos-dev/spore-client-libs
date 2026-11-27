@@ -168,6 +168,31 @@ spore_handler_t* spore_client_register_response_handler(spore_client_t* hClient,
     return hClient->client.registerResponseHandler(fn);
 }
 
+spore_handler_t* spore_client_register_stream_handler(spore_client_t* hClient, spore_stream_fn fn)
+{
+    if (!hClient || !fn)
+        return nullptr;
+    return hClient->client.registerStreamHandler(fn);
+}
+
+const char* spore_stream_get_handle(const spore_stream_t* hStream)
+{
+    return hStream ? hStream->stream.getHandle().data() : nullptr;
+}
+
+const char* spore_stream_get_field(const spore_stream_t* hStream)
+{
+    return hStream ? hStream->stream.getField().data() : nullptr;
+}
+
+const char* spore_stream_get_text(const spore_stream_t* hStream, size_t* size)
+{
+    const auto text = hStream ? hStream->stream.getText() : std::string_view{};
+    if (size)
+        *size = text.size();
+    return hStream ? text.data() : nullptr;
+}
+
 spore_handler_t* spore_client_register_witness_handler(spore_client_t* hClient, spore_witness_fn fn)
 {
     if (!hClient || !fn)

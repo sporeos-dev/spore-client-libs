@@ -62,17 +62,6 @@ namespace
     }
 }
 
-struct spore_response_stream_t
-{
-    spore_client_t* client;
-    std::string handle;
-    std::string command;
-    std::string field;
-    std::mutex mu;
-    bool ended = false;
-    spore_stream_result_t sendError = SPORE_STREAM_OK;
-};
-
 spore_stream_result_t spore_stream_send_start(spore_client_t* client,
                                               spore_string_view_t handle,
                                               spore_string_view_t command,
@@ -127,10 +116,109 @@ spore_stream_result_t spore_stream_send_close(spore_client_t* client,
     return send(client, frame + ">>");
 }
 
-spore_stream_result_t spore_response_stream_open(spore_client_t* client,
-                                                  const spore_request_t* request,
-                                                  spore_string_view_t field,
-                                                  spore_response_stream_t** out)
+namespace spore
+{
+    Stream::Stream(std::string_view handle, std::string_view field, std::string_view text)
+        : handle(handle), field(field), text(text)
+    {
+    }
+
+    Stream::Stream(spore_client_t* client, std::string_view handle, std::string_view command,
+                   std::string_view field)
+        : client(client), handle(handle), command(command), field(field)
+    {
+    }
+
+    std::string_view Stream::getHandle() const
+    {
+        return handle;
+    }
+
+    std::string_view Stream::getField() const
+    {
+        return field;
+    }
+
+    std::string_view Stream::getText() const
+    {
+        return text;
+    }
+
+    spore_stream_result_t Stream::start()
+    {
+        auto f = toView(field);
+        return spore_stream_send_start(client, toView(handle), toView(command), &f, 1);
+    }
+
+    spore_stream_result_t Stream::chunk(spore_string_view_t data)
+    {
+        std::lock_guard<std::mutex> lk(mu);
+        if (sendError != SPORE_STREAM_OK)
+            return sendError;
+        if (ended)
+            return SPORE_STREAM_CLOSED;
+        std::string_view contents;
+        if (!view(data, contents))
+            return SPORE_STREAM_INVALID_ARGUMENT;
+        auto result = spore_stream_send_chunk(client, toView(handle), toView(field), data);
+        if (result == SPORE_STREAM_OK)
+            text = contents;
+        else if (result == SPORE_STREAM_SEND_FAILED || result == SPORE_STREAM_NOT_CONNECTED)
+            sendError = result;
+        return result;
+    }
+
+    spore_stream_result_t Stream::finish(const char* response)
+    {
+        auto result = spore_stream_send_close(client, toView(handle), toView(field));
+        if (result == SPORE_STREAM_OK)
+            result = send(client, response);
+        if (result == SPORE_STREAM_OK)
+            ended = true;
+        else
+            sendError = result;
+        return result;
+    }
+
+    spore_stream_result_t Stream::close()
+    {
+        std::lock_guard<std::mutex> lk(mu);
+        if (sendError != SPORE_STREAM_OK)
+            return sendError;
+        if (ended)
+            return SPORE_STREAM_CLOSED;
+        Response response;
+        response.setHandle(handle);
+        response.setCommand(command);
+        response.serialize();
+        return finish(response.getSerialized());
+    }
+
+    spore_stream_result_t Stream::fail(spore_string_view_t code, spore_string_view_t what)
+    {
+        std::lock_guard<std::mutex> lk(mu);
+        if (sendError != SPORE_STREAM_OK)
+            return sendError;
+        if (ended)
+            return SPORE_STREAM_CLOSED;
+        std::string_view codeText, whatText;
+        if (!view(code, codeText) || !validToken(codeText) || !view(what, whatText) ||
+            whatText.empty())
+            return SPORE_STREAM_INVALID_ARGUMENT;
+        ResponseError response;
+        response.setHandle(handle);
+        response.setCommand(command);
+        response.setCode(codeText);
+        response.setWhat(whatText);
+        response.serialize();
+        return finish(response.getSerialized());
+    }
+}
+
+spore_stream_result_t spore_stream_open(spore_client_t* client,
+                                         const spore_request_t* request,
+                                         spore_string_view_t field,
+                                         spore_stream_t** out)
 {
     if (!out)
         return SPORE_STREAM_INVALID_ARGUMENT;
@@ -138,12 +226,9 @@ spore_stream_result_t spore_response_stream_open(spore_client_t* client,
     std::string_view fieldText;
     if (!client || !request || !view(field, fieldText) || !validToken(fieldText))
         return SPORE_STREAM_INVALID_ARGUMENT;
-    auto* stream = new spore_response_stream_t{
-        client, std::string(request->request.getHandle()), std::string(request->request.getCommand()),
-        std::string(fieldText)
-    };
-    auto result = spore_stream_send_start(client, toView(stream->handle), toView(stream->command),
-                                          &field, 1);
+    auto* stream = new spore_stream_t{spore::Stream(
+        client, request->request.getHandle(), request->request.getCommand(), fieldText)};
+    auto result = stream->stream.start();
     if (result != SPORE_STREAM_OK)
     {
         delete stream;
@@ -153,79 +238,24 @@ spore_stream_result_t spore_response_stream_open(spore_client_t* client,
     return SPORE_STREAM_OK;
 }
 
-spore_stream_result_t spore_response_stream_chunk(spore_response_stream_t* stream,
-                                                   spore_string_view_t text)
+spore_stream_result_t spore_stream_chunk(spore_stream_t* stream, spore_string_view_t text)
 {
-    if (!stream)
-        return SPORE_STREAM_INVALID_ARGUMENT;
-    std::lock_guard<std::mutex> lk(stream->mu);
-    if (stream->sendError != SPORE_STREAM_OK)
-        return stream->sendError;
-    if (stream->ended)
-        return SPORE_STREAM_CLOSED;
-    auto result = spore_stream_send_chunk(stream->client, toView(stream->handle),
-                                          toView(stream->field), text);
-    if (result == SPORE_STREAM_SEND_FAILED || result == SPORE_STREAM_NOT_CONNECTED)
-        stream->sendError = result;
-    return result;
+    return stream ? stream->stream.chunk(text) : SPORE_STREAM_INVALID_ARGUMENT;
 }
 
-namespace
+spore_stream_result_t spore_stream_close(spore_stream_t* stream)
 {
-    spore_stream_result_t finish(spore_response_stream_t* stream, const char* response)
-    {
-        auto result = spore_stream_send_close(stream->client, toView(stream->handle),
-                                               toView(stream->field));
-        if (result == SPORE_STREAM_OK)
-            result = send(stream->client, response);
-        if (result == SPORE_STREAM_OK)
-            stream->ended = true;
-        else
-            stream->sendError = result;
-        return result;
-    }
+    return stream ? stream->stream.close() : SPORE_STREAM_INVALID_ARGUMENT;
 }
 
-spore_stream_result_t spore_response_stream_close(spore_response_stream_t* stream)
+spore_stream_result_t spore_stream_fail(spore_stream_t* stream,
+                                         spore_string_view_t code,
+                                         spore_string_view_t what)
 {
-    if (!stream)
-        return SPORE_STREAM_INVALID_ARGUMENT;
-    std::lock_guard<std::mutex> lk(stream->mu);
-    if (stream->sendError != SPORE_STREAM_OK)
-        return stream->sendError;
-    if (stream->ended)
-        return SPORE_STREAM_CLOSED;
-    spore::Response response;
-    response.setHandle(stream->handle);
-    response.setCommand(stream->command);
-    response.serialize();
-    return finish(stream, response.getSerialized());
+    return stream ? stream->stream.fail(code, what) : SPORE_STREAM_INVALID_ARGUMENT;
 }
 
-spore_stream_result_t spore_response_stream_fail(spore_response_stream_t* stream,
-                                                  spore_string_view_t code,
-                                                  spore_string_view_t what)
-{
-    if (!stream)
-        return SPORE_STREAM_INVALID_ARGUMENT;
-    std::lock_guard<std::mutex> lk(stream->mu);
-    if (stream->sendError != SPORE_STREAM_OK)
-        return stream->sendError;
-    if (stream->ended)
-        return SPORE_STREAM_CLOSED;
-    std::string_view codeText, whatText;
-    if (!view(code, codeText) || !validToken(codeText) || !view(what, whatText) || whatText.empty())
-        return SPORE_STREAM_INVALID_ARGUMENT;
-    spore::ResponseError response;
-    response.setHandle(stream->handle);
-    response.setCommand(stream->command);
-    response.setCode(codeText);
-    response.setWhat(whatText);
-    response.serialize();
-    return finish(stream, response.getSerialized());
-}
-
-void spore_response_stream_destroy(spore_response_stream_t* stream)
+void spore_stream_destroy(spore_stream_t* stream)
 {
     delete stream;
 }

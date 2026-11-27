@@ -15,7 +15,7 @@ import (
 	"unsafe"
 )
 
-type ResponseStream = C.spore_response_stream_t
+type ResponseStream = C.spore_stream_t
 
 func streamResult(result C.spore_stream_result_t) error {
 	switch result {
@@ -43,18 +43,18 @@ func StreamOpen(client *Client, req *Request, field string) (*ResponseStream, er
 	f, free := streamView(field)
 	defer free()
 	var stream *ResponseStream
-	err := streamResult(C.spore_response_stream_open(client, req, f, &stream))
+	err := streamResult(C.spore_stream_open(client, req, f, &stream))
 	return stream, err
 }
 
 func StreamChunk(stream *ResponseStream, text string) error {
 	t, free := streamView(text)
 	defer free()
-	return streamResult(C.spore_response_stream_chunk(stream, t))
+	return streamResult(C.spore_stream_chunk(stream, t))
 }
 
 func StreamClose(stream *ResponseStream) error {
-	return streamResult(C.spore_response_stream_close(stream))
+	return streamResult(C.spore_stream_close(stream))
 }
 
 func StreamFail(stream *ResponseStream, code, what string) error {
@@ -62,11 +62,11 @@ func StreamFail(stream *ResponseStream, code, what string) error {
 	defer freeCode()
 	w, freeWhat := streamView(what)
 	defer freeWhat()
-	return streamResult(C.spore_response_stream_fail(stream, c, w))
+	return streamResult(C.spore_stream_fail(stream, c, w))
 }
 
 func StreamDestroy(stream *ResponseStream) {
-	C.spore_response_stream_destroy(stream)
+	C.spore_stream_destroy(stream)
 }
 
 func StreamSendStart(client *Client, handle, command string, fields []string) error {

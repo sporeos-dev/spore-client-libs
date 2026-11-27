@@ -20,11 +20,11 @@ TEST(ResponseStreamInput, ReportsInvalidAndDisconnected)
     auto* req = spore_request_create();
     spore_request_set_handle(req, "h");
     spore_request_set_command(req, "alias.run");
-    spore_response_stream_t* stream = nullptr;
-    EXPECT_EQ(spore_response_stream_open(client, req, v("bad field"), &stream),
+    spore_stream_t* stream = nullptr;
+    EXPECT_EQ(spore_stream_open(client, req, v("bad field"), &stream),
               SPORE_STREAM_INVALID_ARGUMENT);
     EXPECT_EQ(stream, nullptr);
-    EXPECT_EQ(spore_response_stream_open(client, req, v("output"), &stream),
+    EXPECT_EQ(spore_stream_open(client, req, v("output"), &stream),
               SPORE_STREAM_NOT_CONNECTED);
     EXPECT_EQ(stream, nullptr);
     spore_request_destroy(req);
@@ -81,88 +81,112 @@ namespace
 
 TEST_F(ResponseStreamSocket, CompletesOnceAndCopiesRequest)
 {
-    spore_response_stream_t* stream = nullptr;
-    ASSERT_EQ(spore_response_stream_open(client, req, v("output"), &stream), SPORE_STREAM_OK);
+    spore_stream_t* stream = nullptr;
+    ASSERT_EQ(spore_stream_open(client, req, v("output"), &stream), SPORE_STREAM_OK);
     spore_request_destroy(req);
     req = nullptr;
-    EXPECT_EQ(spore_response_stream_chunk(stream, v("  \"<<\" >> \\n\r\n\t ")), SPORE_STREAM_OK);
-    EXPECT_EQ(spore_response_stream_close(stream), SPORE_STREAM_OK);
-    EXPECT_EQ(spore_response_stream_chunk(stream, v("late")), SPORE_STREAM_CLOSED);
-    EXPECT_EQ(spore_response_stream_close(stream), SPORE_STREAM_CLOSED);
-    EXPECT_EQ(spore_response_stream_fail(stream, v("Execution"), v("late")), SPORE_STREAM_CLOSED);
+    EXPECT_EQ(spore_stream_chunk(stream, v("  \"<<\" >> \\n\r\n\t ")), SPORE_STREAM_OK);
+    EXPECT_EQ(spore_stream_close(stream), SPORE_STREAM_OK);
+    EXPECT_EQ(spore_stream_chunk(stream, v("late")), SPORE_STREAM_CLOSED);
+    EXPECT_EQ(spore_stream_close(stream), SPORE_STREAM_CLOSED);
+    EXPECT_EQ(spore_stream_fail(stream, v("Execution"), v("late")), SPORE_STREAM_CLOSED);
     EXPECT_EQ(readLine(), "~h:alias.run output=<<");
     EXPECT_EQ(readLine(), R"(~h:output<<   "<<" >> \\n\r\n\t )");
     EXPECT_EQ(readLine(), "~h:output>>");
     EXPECT_EQ(readLine(), "~h:alias.run ok");
-    spore_response_stream_destroy(stream);
+    spore_stream_destroy(stream);
+}
+
+TEST_F(ResponseStreamSocket, AccessorsExposeTheMostRecentlySentChunk)
+{
+    spore_stream_t* stream = nullptr;
+    ASSERT_EQ(spore_stream_open(client, req, v("output"), &stream), SPORE_STREAM_OK);
+    EXPECT_STREQ(spore_stream_get_handle(stream), "h");
+    EXPECT_STREQ(spore_stream_get_field(stream), "output");
+
+    size_t size = 0;
+    ASSERT_NE(spore_stream_get_text(stream, &size), nullptr);
+    EXPECT_EQ(size, 0u);
+    ASSERT_EQ(spore_stream_chunk(stream, v("first\n")), SPORE_STREAM_OK);
+    const std::string nul("bad\0text", 8);
+    EXPECT_EQ(spore_stream_chunk(stream, v(nul)), SPORE_STREAM_INVALID_ARGUMENT);
+    const char* text = spore_stream_get_text(stream, &size);
+    ASSERT_NE(text, nullptr);
+    EXPECT_EQ(std::string(text, size), "first\n");
+    ASSERT_EQ(spore_stream_close(stream), SPORE_STREAM_OK);
+    EXPECT_EQ(readLine(), "~h:alias.run output=<<");
+    EXPECT_EQ(readLine(), R"(~h:output<< first\n)");
+    EXPECT_EQ(readLine(), "~h:output>>");
+    EXPECT_EQ(readLine(), "~h:alias.run ok");
+    spore_stream_destroy(stream);
 }
 
 TEST_F(ResponseStreamSocket, FailureClosesFieldAndPreservesOutput)
 {
-    spore_response_stream_t* stream = nullptr;
-    ASSERT_EQ(spore_response_stream_open(client, req, v("output"), &stream), SPORE_STREAM_OK);
-    ASSERT_EQ(spore_response_stream_chunk(stream, v("partial\n")), SPORE_STREAM_OK);
-    EXPECT_EQ(spore_response_stream_fail(stream, v("Execution"), v("failed\nretry")), SPORE_STREAM_OK);
+    spore_stream_t* stream = nullptr;
+    ASSERT_EQ(spore_stream_open(client, req, v("output"), &stream), SPORE_STREAM_OK);
+    ASSERT_EQ(spore_stream_chunk(stream, v("partial\n")), SPORE_STREAM_OK);
+    EXPECT_EQ(spore_stream_fail(stream, v("Execution"), v("failed\nretry")), SPORE_STREAM_OK);
     EXPECT_EQ(readLine(), "~h:alias.run output=<<");
     EXPECT_EQ(readLine(), R"(~h:output<< partial\n)");
     EXPECT_EQ(readLine(), "~h:output>>");
     EXPECT_EQ(readLine(), R"(~h:alias.run error code=Execution what="failed\nretry" node_error)");
-    spore_response_stream_destroy(stream);
+    spore_stream_destroy(stream);
 }
 
 TEST_F(ResponseStreamSocket, RejectsInvalidInputAndRemainsOpen)
 {
-    spore_response_stream_t* stream = nullptr;
-    ASSERT_EQ(spore_response_stream_open(client, req, v("output"), &stream), SPORE_STREAM_OK);
+    spore_stream_t* stream = nullptr;
+    ASSERT_EQ(spore_stream_open(client, req, v("output"), &stream), SPORE_STREAM_OK);
     const std::string nul("bad\0text", 8);
-    EXPECT_EQ(spore_response_stream_chunk(stream, v(nul)), SPORE_STREAM_INVALID_ARGUMENT);
-    EXPECT_EQ(spore_response_stream_fail(stream, v("bad code"), v("reason")), SPORE_STREAM_INVALID_ARGUMENT);
-    EXPECT_EQ(spore_response_stream_fail(stream, v("Execution"), v(nul)), SPORE_STREAM_INVALID_ARGUMENT);
-    EXPECT_EQ(spore_response_stream_fail(stream, v("Execution"), v("")), SPORE_STREAM_INVALID_ARGUMENT);
-    EXPECT_EQ(spore_response_stream_close(stream), SPORE_STREAM_OK);
+    EXPECT_EQ(spore_stream_chunk(stream, v(nul)), SPORE_STREAM_INVALID_ARGUMENT);
+    EXPECT_EQ(spore_stream_fail(stream, v("bad code"), v("reason")), SPORE_STREAM_INVALID_ARGUMENT);
+    EXPECT_EQ(spore_stream_fail(stream, v("Execution"), v(nul)), SPORE_STREAM_INVALID_ARGUMENT);
+    EXPECT_EQ(spore_stream_fail(stream, v("Execution"), v("")), SPORE_STREAM_INVALID_ARGUMENT);
+    EXPECT_EQ(spore_stream_close(stream), SPORE_STREAM_OK);
     EXPECT_EQ(readLine(), "~h:alias.run output=<<");
     EXPECT_EQ(readLine(), "~h:output>>");
     EXPECT_EQ(readLine(), "~h:alias.run ok");
-    spore_response_stream_destroy(stream);
+    spore_stream_destroy(stream);
 }
 
 TEST_F(ResponseStreamSocket, DisconnectionStopsFurtherOperations)
 {
-    spore_response_stream_t* stream = nullptr;
-    ASSERT_EQ(spore_response_stream_open(client, req, v("output"), &stream), SPORE_STREAM_OK);
+    spore_stream_t* stream = nullptr;
+    ASSERT_EQ(spore_stream_open(client, req, v("output"), &stream), SPORE_STREAM_OK);
     EXPECT_EQ(readLine(), "~h:alias.run output=<<");
     spore_client_disconnect(client);
-    EXPECT_EQ(spore_response_stream_chunk(stream, v("text")), SPORE_STREAM_NOT_CONNECTED);
-    EXPECT_EQ(spore_response_stream_close(stream), SPORE_STREAM_NOT_CONNECTED);
-    EXPECT_EQ(spore_response_stream_fail(stream, v("Execution"), v("reason")), SPORE_STREAM_NOT_CONNECTED);
-    spore_response_stream_destroy(stream);
+    EXPECT_EQ(spore_stream_chunk(stream, v("text")), SPORE_STREAM_NOT_CONNECTED);
+    EXPECT_EQ(spore_stream_close(stream), SPORE_STREAM_NOT_CONNECTED);
+    EXPECT_EQ(spore_stream_fail(stream, v("Execution"), v("reason")), SPORE_STREAM_NOT_CONNECTED);
+    spore_stream_destroy(stream);
 }
 
 TEST_F(ResponseStreamSocket, SendFailureIsReportedByTheStream)
 {
-    spore_response_stream_t* stream = nullptr;
-    ASSERT_EQ(spore_response_stream_open(client, req, v("output"), &stream), SPORE_STREAM_OK);
+    spore_stream_t* stream = nullptr;
+    ASSERT_EQ(spore_stream_open(client, req, v("output"), &stream), SPORE_STREAM_OK);
     EXPECT_EQ(readLine(), "~h:alias.run output=<<");
     close(peer);
     peer = -1;
-    EXPECT_EQ(spore_response_stream_chunk(stream, v("text")), SPORE_STREAM_SEND_FAILED);
-    EXPECT_EQ(spore_response_stream_close(stream), SPORE_STREAM_SEND_FAILED);
-    spore_response_stream_destroy(stream);
+    EXPECT_EQ(spore_stream_chunk(stream, v("text")), SPORE_STREAM_SEND_FAILED);
+    EXPECT_EQ(spore_stream_close(stream), SPORE_STREAM_SEND_FAILED);
+    spore_stream_destroy(stream);
 }
 
 TEST_F(ResponseStreamSocket, ConcurrentStreamsKeepFramesSeparate)
 {
-    spore_response_stream_t* first = nullptr;
-    spore_response_stream_t* second = nullptr;
-    ASSERT_EQ(spore_response_stream_open(client, req, v("output"), &first), SPORE_STREAM_OK);
+    spore_stream_t* first = nullptr;
+    spore_stream_t* second = nullptr;
+    ASSERT_EQ(spore_stream_open(client, req, v("output"), &first), SPORE_STREAM_OK);
     spore_request_set_handle(req, "other");
-    ASSERT_EQ(spore_response_stream_open(client, req, v("output"), &second), SPORE_STREAM_OK);
+    ASSERT_EQ(spore_stream_open(client, req, v("output"), &second), SPORE_STREAM_OK);
     std::atomic<bool> failed{false};
-    auto write = [&failed](spore_response_stream_t* stream, const char* text) {
+    auto write = [&failed](spore_stream_t* stream, const char* text) {
         for (int i = 0; i < 20; ++i)
-            if (spore_response_stream_chunk(stream, v(text)) != SPORE_STREAM_OK)
+            if (spore_stream_chunk(stream, v(text)) != SPORE_STREAM_OK)
                 failed = true;
-        if (spore_response_stream_close(stream) != SPORE_STREAM_OK)
+        if (spore_stream_close(stream) != SPORE_STREAM_OK)
             failed = true;
     };
     std::thread a(write, first, "first");
@@ -191,8 +215,8 @@ TEST_F(ResponseStreamSocket, ConcurrentStreamsKeepFramesSeparate)
     EXPECT_EQ(firstChunks, 20);
     EXPECT_EQ(secondChunks, 20);
     EXPECT_EQ(completions, 4);
-    spore_response_stream_destroy(first);
-    spore_response_stream_destroy(second);
+    spore_stream_destroy(first);
+    spore_stream_destroy(second);
 }
 
 TEST_F(ResponseStreamSocket, LowLevelMultiFieldFrames)

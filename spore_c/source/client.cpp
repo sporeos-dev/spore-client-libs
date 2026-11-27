@@ -41,6 +41,7 @@ namespace spore
         disconnect();
         for (auto* h : requestHandlers) delete h;
         for (auto* h : responseHandlers) delete h;
+        for (auto* h : streamHandlers) delete h;
         for (auto* h : witnessHandlers) delete h;
         for (auto* h : publishHandlers) delete h;
         for (auto* h : parseErrorHandlers) delete h;
@@ -224,6 +225,16 @@ namespace spore
         return h;
     }
 
+    spore_handler_t* Client::registerStreamHandler(spore_stream_fn fn)
+    {
+        auto* h = new spore_handler_t{};
+        h->type = spore_handler_t::type_t::stream;
+        h->id = nextId++;
+        h->onStream = fn;
+        streamHandlers.push_back(h);
+        return h;
+    }
+
     spore_handler_t* Client::registerWitnessHandler(spore_witness_fn fn)
     {
         auto* h = new spore_handler_t{};
@@ -276,6 +287,9 @@ namespace spore
                 break;
             case spore_handler_t::type_t::response:
                 erase(responseHandlers);
+                break;
+            case spore_handler_t::type_t::stream:
+                erase(streamHandlers);
                 break;
             case spore_handler_t::type_t::witness:
                 erase(witnessHandlers);
@@ -503,6 +517,16 @@ namespace spore
 
                 switch (spore_parser_get_type(parser))
                 {
+                    case SPORE_PARSER_TYPE_STREAM:
+                    {
+                        size_t size = 0;
+                        const char* text = spore_message_get_stream_text(msg, &size);
+                        spore_stream_t stream{Stream(
+                            spore_message_get_handle(msg), spore_message_get_stream_field(msg),
+                            std::string_view(text, size))};
+                        for (auto* h : streamHandlers) h->onStream(self, &stream);
+                        break;
+                    }
                     case SPORE_PARSER_TYPE_REQUEST:
                     {
                         spore_request_t req{};

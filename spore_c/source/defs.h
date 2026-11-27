@@ -8,6 +8,7 @@
 #include "client.h"
 #include "request.h"
 #include "response.h"
+#include "stream.h"
 #include "witness.h"
 #include "publish.h"
 
@@ -25,6 +26,7 @@ struct spore_handler_t
     {
         request,
         response,
+        stream,
         witness,
         publish,
         parse_error
@@ -34,6 +36,7 @@ struct spore_handler_t
     {
         spore_request_fn onRequest;
         spore_response_fn onResponse;
+        spore_stream_fn onStream;
         spore_witness_fn onWitness;
         spore_publish_fn onPublish;
         spore_parse_error_fn onParseError;
@@ -53,6 +56,11 @@ struct spore_response_t
 struct spore_response_error_t
 {
     spore::ResponseError error;
+};
+
+struct spore_stream_t
+{
+    spore::Stream stream;
 };
 
 struct spore_witness_t

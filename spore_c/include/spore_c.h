@@ -26,7 +26,7 @@ extern "C"
     typedef struct spore_response_error_t spore_response_error_t;
     typedef struct spore_witness_t spore_witness_t;
     typedef struct spore_publish_t spore_publish_t;
-    typedef struct spore_response_stream_t spore_response_stream_t;
+    typedef struct spore_stream_t spore_stream_t;
 
     typedef struct spore_string_view_t
     {
@@ -48,6 +48,8 @@ extern "C"
     typedef void (*spore_response_fn)(spore_client_t* hClient,
                                       const spore_response_t* hResponse,
                                       const spore_response_error_t* hError);
+    // The chunk and its contents are borrowed and valid only during the callback.
+    typedef void (*spore_stream_fn)(spore_client_t* hClient, const spore_stream_t* hStream);
     typedef void (*spore_witness_fn)(spore_client_t* hClient, const spore_witness_t* hWitness);
     typedef void (*spore_publish_fn)(spore_client_t* hClient, const spore_publish_t* hPublish);
     typedef void (*spore_parse_error_fn)(spore_client_t* hClient,
@@ -82,6 +84,8 @@ extern "C"
                                                            spore_witness_fn fn);
     spore_handler_t* spore_client_register_response_handler(spore_client_t* hClient,
                                                             spore_response_fn fn);
+    spore_handler_t* spore_client_register_stream_handler(spore_client_t* hClient,
+                                                          spore_stream_fn fn);
     spore_handler_t* spore_client_register_publish_handler(spore_client_t* hClient,
                                                            spore_publish_fn fn);
     spore_handler_t* spore_client_register_parse_error_handler(spore_client_t* hClient,
@@ -124,19 +128,22 @@ extern "C"
 
     // Open copies the request identity and starts one streamed field. Keep the client alive
     // until the stream is destroyed. Destroying a stream does not send a response.
-    spore_stream_result_t spore_response_stream_open(spore_client_t* hClient,
-                                                      const spore_request_t* hRequest,
-                                                      spore_string_view_t field,
-                                                      spore_response_stream_t** out);
-    spore_stream_result_t spore_response_stream_chunk(spore_response_stream_t* hStream,
-                                                       spore_string_view_t text);
+    spore_stream_result_t spore_stream_open(spore_client_t* hClient,
+                                            const spore_request_t* hRequest,
+                                            spore_string_view_t field,
+                                            spore_stream_t** out);
+    spore_stream_result_t spore_stream_chunk(spore_stream_t* hStream, spore_string_view_t text);
     // Close sends success; fail closes the field and sends an error with nonempty code/what.
-    spore_stream_result_t spore_response_stream_close(spore_response_stream_t* hStream);
-    spore_stream_result_t spore_response_stream_fail(spore_response_stream_t* hStream,
-                                                      spore_string_view_t code,
-                                                      spore_string_view_t what);
+    spore_stream_result_t spore_stream_close(spore_stream_t* hStream);
+    spore_stream_result_t spore_stream_fail(spore_stream_t* hStream,
+                                            spore_string_view_t code,
+                                            spore_string_view_t what);
     // Do not destroy a stream concurrently with an operation on it.
-    void spore_response_stream_destroy(spore_response_stream_t* hStream);
+    void spore_stream_destroy(spore_stream_t* hStream);
+
+    const char* spore_stream_get_handle(const spore_stream_t* hStream);
+    const char* spore_stream_get_field(const spore_stream_t* hStream);
+    const char* spore_stream_get_text(const spore_stream_t* hStream, size_t* size);
 
     //
     //

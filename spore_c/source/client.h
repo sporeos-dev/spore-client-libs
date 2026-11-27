@@ -42,6 +42,7 @@ namespace spore
 
         spore_handler_t* registerRequestHandler(spore_request_fn fn);
         spore_handler_t* registerResponseHandler(spore_response_fn fn);
+        spore_handler_t* registerStreamHandler(spore_stream_fn fn);
         spore_handler_t* registerWitnessHandler(spore_witness_fn fn);
         spore_handler_t* registerPublishHandler(spore_publish_fn fn);
         spore_handler_t* registerParseErrorHandler(spore_parse_error_fn fn);
@@ -92,6 +93,7 @@ namespace spore
 
         std::vector<spore_handler_t*> requestHandlers;
         std::vector<spore_handler_t*> responseHandlers;
+        std::vector<spore_handler_t*> streamHandlers;
         std::vector<spore_handler_t*> witnessHandlers;
         std::vector<spore_handler_t*> publishHandlers;
         std::vector<spore_handler_t*> parseErrorHandlers;
