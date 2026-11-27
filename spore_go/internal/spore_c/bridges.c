@@ -12,6 +12,9 @@ spore_handler_t* registerRequestHandler(spore_client_t* c) {
 spore_handler_t* registerResponseHandler(spore_client_t* c) {
     return spore_client_register_response_handler(c, (spore_response_fn)goResponseBridge);
 }
+spore_handler_t* registerStreamHandler(spore_client_t* c) {
+    return spore_client_register_stream_handler(c, (spore_stream_fn)goStreamBridge);
+}
 spore_handler_t* registerWitnessHandler(spore_client_t* c) {
     return spore_client_register_witness_handler(c, (spore_witness_fn)goWitnessBridge);
 }

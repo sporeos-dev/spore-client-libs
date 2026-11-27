@@ -35,6 +35,7 @@ namespace
     std::vector<std::string> errors;
     int removedCalls = 0;
     int secondCalls = 0;
+    spore_handler_t* selfRemoving = nullptr;
 
     void onStream(spore_client_t*, const spore_stream_t* chunk)
     {
@@ -57,6 +58,12 @@ namespace
     {
         std::lock_guard<std::mutex> lk(captureMu);
         ++secondCalls;
+    }
+
+    void removeSelf(spore_client_t* client, const spore_stream_t*)
+    {
+        spore_client_unregister_handler(client, selfRemoving);
+        selfRemoving = nullptr;
     }
 
     void onResponse(spore_client_t*, const spore_response_t* response,
@@ -89,6 +96,7 @@ namespace
             errors.clear();
             removedCalls = 0;
             secondCalls = 0;
+            selfRemoving = nullptr;
             int fds[2];
             ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
             client = spore_client_create("test.stream.handlers");
@@ -182,6 +190,22 @@ TEST_F(StreamHandlers, MalformedChunksReportParseErrors)
         EXPECT_TRUE(chunks.empty());
         for (const auto& error : errors)
             EXPECT_EQ(error, "Malformed");
+    }
+}
+
+TEST_F(StreamHandlers, HandlerCanRemoveItselfDuringDelivery)
+{
+    selfRemoving = spore_client_register_stream_handler(client, removeSelf);
+    ASSERT_NE(selfRemoving, nullptr);
+    ASSERT_NE(spore_client_register_stream_handler(client, secondStream), nullptr);
+    ASSERT_NE(spore_client_register_response_handler(client, onResponse), nullptr);
+    reader = std::thread([&] { spore_client_listen(client); });
+    EXPECT_EQ(readLine(), "READY");
+    send("~h:output<< first\n~h:output<< second\n~h:alias.run ok output=complete\n");
+    {
+        std::unique_lock<std::mutex> lk(captureMu);
+        EXPECT_TRUE(captureChanged.wait_for(lk, std::chrono::seconds(2), [] { return !responses.empty(); }));
+        EXPECT_EQ(secondCalls, 2);
     }
 }
 

@@ -231,6 +231,7 @@ namespace spore
         h->type = spore_handler_t::type_t::stream;
         h->id = nextId++;
         h->onStream = fn;
+        std::lock_guard<std::mutex> lk(streamHandlersMu);
         streamHandlers.push_back(h);
         return h;
     }
@@ -289,8 +290,11 @@ namespace spore
                 erase(responseHandlers);
                 break;
             case spore_handler_t::type_t::stream:
+            {
+                std::lock_guard<std::mutex> lk(streamHandlersMu);
                 erase(streamHandlers);
                 break;
+            }
             case spore_handler_t::type_t::witness:
                 erase(witnessHandlers);
                 break;
@@ -524,7 +528,12 @@ namespace spore
                         spore_stream_t stream{Stream(
                             spore_message_get_handle(msg), spore_message_get_stream_field(msg),
                             std::string_view(text, size))};
-                        for (auto* h : streamHandlers) h->onStream(self, &stream);
+                        std::vector<spore_stream_fn> handlers;
+                        {
+                            std::lock_guard<std::mutex> lk(streamHandlersMu);
+                            for (auto* h : streamHandlers) handlers.push_back(h->onStream);
+                        }
+                        for (auto fn : handlers) fn(self, &stream);
                         break;
                     }
                     case SPORE_PARSER_TYPE_REQUEST:

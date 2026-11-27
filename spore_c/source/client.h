@@ -73,7 +73,7 @@ namespace spore
         std::string nodeId;
         socket_t socketFd = kInvalidSocket;
         std::atomic<bool> connected{ false };
-        int nextId = 0;
+        std::atomic<int> nextId{ 0 };
         std::string errorCode;
         std::string errorWhat;
 
@@ -93,6 +93,7 @@ namespace spore
 
         std::vector<spore_handler_t*> requestHandlers;
         std::vector<spore_handler_t*> responseHandlers;
+        std::mutex streamHandlersMu;
         std::vector<spore_handler_t*> streamHandlers;
         std::vector<spore_handler_t*> witnessHandlers;
         std::vector<spore_handler_t*> publishHandlers;
